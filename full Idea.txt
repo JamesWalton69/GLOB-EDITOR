@@ -1,0 +1,47 @@
+# GlobEditor - The Premium Cloud IDE Concept
+
+## 1. The Vision
+GlobEditor is designed to be a high-performance, aesthetically stunning, and multi-user web-based IDE. It brings the power of a desktop code editor (like VS Code or Xcode) into the browser, allowing developers to write, manage, and execute code from anywhere without setting up a local environment.
+
+## 2. Core Pillars
+*   **Elite Aesthetics**: A "Glassmorphism" UI inspired by modern macOS and Apple design principles. It uses dark modes, vibrant accents, and smooth transitions to create a premium feel.
+*   **Universal Execution**: Supports both client-side (local) and server-side (cloud) execution, giving users flexibility based on their needs.
+*   **Scalable Architecture**: Built with a robust backend (Supabase) to handle authentication, file storage, and administrative controls.
+
+## 3. Key Features
+### A. Pro-Grade Editor
+*   **Powered by Monaco**: Uses the same engine as VS Code for industry-standard syntax highlighting, auto-completion, and command palettes.
+*   **Multi-Language Support**: Smart detection for Python, JavaScript, HTML, CSS, Java, C, and C++.
+
+### B. Dual Execution Engines
+*   **Local Engine (Pyodide)**: Runs Python code directly in your browser using WebAssembly. It’s fast, private, and supports interactive inputs.
+*   **Cloud Engine (CodeX)**: Offloads heavy computation or non-browser languages (like Java/C++) to high-speed cloud servers, returning results instantly.
+
+### C. Smart File System
+*   **Persistent Storage**: All files are saved in the cloud. You can refresh, switch devices, or log back in a month later, and your code will be exactly where you left it.
+*   **Hierarchical Navigation**: Create, rename, delete, and organize files into folders just like a real OS.
+
+### D. Security & Roles
+*   **Google Auth**: Secure, one-tap login.
+*   **Admin Mode**: A special "Master View" for administrators to manage and monitor files across all users, while regular users are restricted to their own private workspace.
+
+## 4. Technical Stack
+*   **Frontend**: React.js + Vite (for speed) + Lucide Icons (for sharp visuals).
+*   **Database & Auth**: Supabase (PostgreSQL + GoTrue).
+*   **Storage**: Supabase Storage Buckets with strict Row-Level Security (RLS).
+*   **Execution**: 
+    *   Client-side: Pyodide (WASM).
+    *   Server-side: CodeX API.
+*   **Styling**: Vanilla CSS with a focus on modern gradients and transparency.
+
+## 5. The "Full Idea" Logic
+The goal is to create a platform where a student or developer can:
+1. Log in via Google.
+2. Immediately jump into a folder-structured workspace.
+3. Write complex scripts.
+4. "Run Local" for quick Python testing.
+5. "Run Cloud" for compiled languages or heavy tasks.
+6. Have an Admin oversee the system, transforming it into a "Coding Classroom" or a "Development Hub" for teams.
+
+---
+**GlobEditor: Code Anywhere, Build Everything.**
