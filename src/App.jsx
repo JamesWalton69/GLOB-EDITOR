@@ -11,6 +11,7 @@ import {
   Download, Maximize2, Minimize2
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+import { Analytics } from '@vercel/analytics/react';
 
 // ─────────────────────────────────────────────────────
 //  HELPERS
@@ -1320,6 +1321,7 @@ export default function App() {
 
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} />
+      <Analytics />
     </div>
   );
 }
