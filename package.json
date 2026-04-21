@@ -12,6 +12,7 @@
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "@supabase/supabase-js": "^2.103.3",
+    "@vercel/speed-insights": "^2.0.0",
     "lucide-react": "^1.8.0",
     "monaco-editor": "^0.55.1",
     "pyodide": "^0.29.3",

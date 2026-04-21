@@ -11,6 +11,7 @@ import {
   Download, Maximize2, Minimize2
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // ─────────────────────────────────────────────────────
 //  HELPERS
@@ -1320,6 +1321,9 @@ export default function App() {
 
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} />
+
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />
     </div>
   );
 }
