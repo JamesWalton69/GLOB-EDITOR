@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Signing in…</title>
+    <style>
+      html, body { margin: 0; height: 100%; display: grid; place-items: center; background: #101014; color: #f5f5f7; font: 14px system-ui, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <p>Signing in…</p>
+    <script>
+      var params = new URLSearchParams(window.location.search);
+      var hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      var get = function (key) { return params.get(key) || hash.get(key); };
+      var payload = {
+        type: 'globeditor-oauth',
+        userId: get('userId'),
+        secret: get('secret'),
+        error: get('error') || get('message')
+      };
+      try {
+        localStorage.setItem('globeditor-oauth-result', JSON.stringify(payload));
+      } catch (e) {}
+      if (window.opener) {
+        window.opener.postMessage(payload, window.location.origin);
+      }
+      window.close();
+    </script>
+  </body>
+</html>

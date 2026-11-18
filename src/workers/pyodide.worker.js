@@ -1,6 +1,5 @@
-import { loadPyodide } from 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.mjs';
-
 const PYODIDE_INDEX_URL = 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/';
+const PYODIDE_MODULE_URL = `${PYODIDE_INDEX_URL}pyodide.mjs`;
 
 let pyodidePromise;
 let stdinControl;
@@ -52,31 +51,31 @@ function waitForStdinChunk() {
 async function ensurePyodide() {
   if (!pyodidePromise) {
     post('system', { text: 'Loading Pyodide runtime...' });
-    pyodidePromise = loadPyodide({ indexURL: PYODIDE_INDEX_URL }).then((instance) => {
-      instance.setStdout({ batched: (text) => post('stdout', { text }) });
-      instance.setStderr({ batched: (text) => post('stderr', { text }) });
-      instance.setStdin({
-        read: (buffer) => {
-          if (stdinQueueOffset >= stdinQueue.length) {
-            stdinQueue = waitForStdinChunk();
-            stdinQueueOffset = 0;
-          }
+    pyodidePromise = import(/* @vite-ignore */ PYODIDE_MODULE_URL)
+      .then(({ loadPyodide }) => loadPyodide({ indexURL: PYODIDE_INDEX_URL }))
+      .then((instance) => {
+        instance.setStdout({ batched: (text) => post('stdout', { text }) });
+        instance.setStderr({ batched: (text) => post('stderr', { text }) });
+        instance.setStdin({
+          read: (buffer) => {
+            if (stdinQueueOffset >= stdinQueue.length) {
+              stdinQueue = waitForStdinChunk();
+              stdinQueueOffset = 0;
+            }
 
-          if (stdinQueue.length === 0) {
-            return 0;
-          }
+            if (stdinQueue.length === 0) return 0;
 
-          const remaining = stdinQueue.length - stdinQueueOffset;
-          const bytesToCopy = Math.min(buffer.length, remaining);
-          buffer.set(stdinQueue.subarray(stdinQueueOffset, stdinQueueOffset + bytesToCopy), 0);
-          stdinQueueOffset += bytesToCopy;
-          return bytesToCopy;
-        },
-        isatty: true,
+            const remaining = stdinQueue.length - stdinQueueOffset;
+            const bytesToCopy = Math.min(buffer.length, remaining);
+            buffer.set(stdinQueue.subarray(stdinQueueOffset, stdinQueueOffset + bytesToCopy), 0);
+            stdinQueueOffset += bytesToCopy;
+            return bytesToCopy;
+          },
+          isatty: true,
+        });
+        post('system', { text: 'Pyodide ready.' });
+        return instance;
       });
-      post('system', { text: 'Pyodide ready.' });
-      return instance;
-    });
   }
 
   return pyodidePromise;

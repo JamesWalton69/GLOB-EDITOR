@@ -1,41 +1,37 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth, ADMIN_EMAIL } from './AuthContext';
-import { supabase } from './supabase';
+import { useAuth, isAdminUser } from './lib/auth';
+import { listAllFiles, readFile, writeFile } from './lib/storage';
+import { runRemote } from './lib/compiler';
+import { getLang, getLangColor, basename } from './lib/editor';
+import ToastContainer from './components/ToastContainer';
+import FileExplorer from './components/FileExplorer';
+import SearchPanel from './components/SearchPanel';
+import SettingsPanel from './components/SettingsPanel';
+import LandingPage from './components/LandingPage';
 import './App.css';
 import {
-  FileCode, Folder, Search, Settings, Play, LogOut,
-  ChevronRight, Plus, FilePlus, FolderPlus, Trash2,
-  Globe, Save, RefreshCw, Code, Layout, X, Pencil,
-  Terminal as TerminalIcon, Shield, ChevronDown,
-  GitBranch, Bell, CheckCircle, AlertCircle, Info,
-  Download, Maximize2, Minimize2
+  FileCode, Search, Settings, LogOut,
+  Save, Code, X,
+  Terminal as TerminalIcon, Shield,
+  GitBranch, Download, Maximize2, Minimize2
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
-import LandingPage from './LandingPage';
 
 // ─────────────────────────────────────────────────────
 //  HELPERS
 // ─────────────────────────────────────────────────────
-const LANG_MAP = {
-  py: 'python', js: 'javascript', jsx: 'javascript',
-  ts: 'typescript', tsx: 'typescript', html: 'html',
-  css: 'css', java: 'java', c: 'c', cpp: 'cpp',
-  json: 'json', md: 'markdown', txt: 'plaintext', sql: 'sql',
+const CODEX_LANG = {
+  python: 'python', javascript: 'javascript', typescript: 'typescript',
+  java: 'java', c: 'c', cpp: 'cpp', sql: 'sql',
 };
-const CODEX_LANG = { python: 'python', javascript: 'js', java: 'java', c: 'c', cpp: 'cpp' };
-const LANG_ICON_COLOR = {
-  python: '#3b82f6', javascript: '#f59e0b', java: '#f97316',
-  html: '#f43f5e', css: '#8b5cf6', c: '#06b6d4', cpp: '#06b6d4',
-  default: '#6b7280',
+const PYODIDE_INPUT_BUFFER_SIZE = 64 * 1024;
+const SETTINGS_KEY = 'globeditor.settings';
+const SETTINGS_DEFAULTS = {
+  fontSize: 13, wordWrap: 'off', minimap: false,
+  tabSize: 2, theme: 'vs-dark', autoSave: false, termFontSize: 12,
+  cloudProvider: 'jdoodle',
 };
 
-const getLang = (filename = '') => {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  return LANG_MAP[ext] || 'plaintext';
-};
-const getLangColor = (lang) => LANG_ICON_COLOR[lang] || LANG_ICON_COLOR.default;
-const basename = (path = '') => path.split('/').pop();
-const PYODIDE_INPUT_BUFFER_SIZE = 64 * 1024;
 const SHELL_PROMPT = 'workspace';
 const TERMINAL_COMMANDS = ['help', 'clear', 'pwd', 'ls', 'open', 'cat', 'run', 'python', 'save', 'tabs', 'echo', 'history'];
 const LANGUAGE_COMPLETIONS = {
@@ -71,429 +67,11 @@ const parseCommand = (value = '') => {
 };
 
 // ─────────────────────────────────────────────────────
-//  TOAST SYSTEM
-// ─────────────────────────────────────────────────────
-function ToastContainer({ toasts }) {
-  return (
-    <div className="toast-container">
-      {toasts.map(t => (
-        <div key={t.id} className={`toast ${t.type}`}>
-          {t.type === 'success' && <CheckCircle size={14} color="var(--accent-success)" />}
-          {t.type === 'error'   && <AlertCircle  size={14} color="var(--accent-danger)" />}
-          {t.type === 'info'    && <Info          size={14} color="var(--accent-primary)" />}
-          {t.message}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────
-//  CONTEXT MENU
-// ─────────────────────────────────────────────────────
-function ContextMenu({ x, y, items, onClose }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const handle = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
-    document.addEventListener('mousedown', handle);
-    return () => document.removeEventListener('mousedown', handle);
-  }, [onClose]);
-
-  return (
-    <div ref={ref} className="context-menu" style={{ left: x, top: y }}>
-      {items.map((item, i) =>
-        item === 'sep'
-          ? <div key={i} className="context-menu-separator" />
-          : (
-            <div key={i} className={`context-menu-item ${item.danger ? 'danger' : ''}`}
-              onClick={() => { item.action(); onClose(); }}>
-              {item.icon && <item.icon size={12} />}
-              {item.label}
-            </div>
-          )
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────
-//  FILE EXPLORER
-// ─────────────────────────────────────────────────────
-function FileExplorer({ isAdmin, user, onSelectFile, activeFilePath, addToast }) {
-  const [items, setItems] = useState([]);
-  const [currentPath, setCurrentPath] = useState(isAdmin ? '' : user.id);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(null); // 'file' | 'folder' | null
-  const [newName, setNewName] = useState('');
-  const [renaming, setRenaming] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [ctxMenu, setCtxMenu] = useState(null);
-  const newInputRef = useRef(null);
-  const renameInputRef = useRef(null);
-
-  useEffect(() => { fetchStorage(); }, [currentPath]);
-  useEffect(() => { if (creating && newInputRef.current) newInputRef.current.focus(); }, [creating]);
-  useEffect(() => { if (renaming && renameInputRef.current) renameInputRef.current.focus(); }, [renaming]);
-
-  const fetchStorage = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.storage.from('editor_files').list(currentPath, { limit: 200, sortBy: { column: 'name', order: 'asc' } });
-      if (error) throw error;
-      const filtered = (data || []).filter(i => i.name !== '.keep' && i.name !== '.emptyFolderPlaceholder');
-      // folders first, then files
-      const folders = filtered.filter(i => !i.id);
-      const files   = filtered.filter(i =>  i.id);
-      setItems([...folders, ...files]);
-    } catch (err) { addToast('error', err.message); }
-    setLoading(false);
-  };
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    const name = newName.trim();
-    if (!name) { setCreating(null); return; }
-    const isFile = creating === 'file';
-    const uploadPath = currentPath
-      ? `${currentPath}/${name}${isFile ? '' : '/.keep'}`
-      : `${name}${isFile ? '' : '/.keep'}`;
-    const { error } = await supabase.storage.from('editor_files').upload(uploadPath, isFile ? '' : '', { upsert: false });
-    if (error) { addToast('error', 'Create failed: ' + error.message); }
-    else {
-      addToast('success', `Created ${name}`);
-      setCreating(null); setNewName('');
-      fetchStorage();
-      if (isFile) onSelectFile(uploadPath);
-    }
-  };
-
-  const handleDelete = async (item) => {
-    const isFolder = !item.id;
-    const pathToDelete = currentPath ? `${currentPath}/${item.name}` : item.name;
-    if (!window.confirm(`Delete "${item.name}"${isFolder ? ' and all its contents' : ''}?`)) return;
-    if (isFolder) {
-      // list all files in folder and delete them
-      const { data } = await supabase.storage.from('editor_files').list(pathToDelete, { limit: 500 });
-      if (data?.length) {
-        await supabase.storage.from('editor_files').remove(data.map(f => `${pathToDelete}/${f.name}`));
-      }
-      await supabase.storage.from('editor_files').remove([`${pathToDelete}/.keep`]);
-    } else {
-      const { error } = await supabase.storage.from('editor_files').remove([pathToDelete]);
-      if (error) { addToast('error', 'Delete failed: ' + error.message); return; }
-    }
-    addToast('success', `Deleted ${item.name}`);
-    fetchStorage();
-  };
-
-  const handleRename = async (e, item) => {
-    e.preventDefault();
-    const name = renameValue.trim();
-    if (!name || name === item.name) { setRenaming(null); return; }
-    const oldPath = currentPath ? `${currentPath}/${item.name}` : item.name;
-    const newPath = currentPath ? `${currentPath}/${name}` : name;
-    const { data: fileData } = await supabase.storage.from('editor_files').download(oldPath);
-    if (!fileData) { addToast('error', 'Could not read file for rename.'); setRenaming(null); return; }
-    const { error: uploadErr } = await supabase.storage.from('editor_files').upload(newPath, fileData, { upsert: false });
-    if (uploadErr) { addToast('error', 'Rename failed: ' + uploadErr.message); setRenaming(null); return; }
-    await supabase.storage.from('editor_files').remove([oldPath]);
-    addToast('success', `Renamed to ${name}`);
-    setRenaming(null); setRenameValue('');
-    fetchStorage();
-    if (activeFilePath === oldPath) onSelectFile(newPath);
-  };
-
-  const openContextMenu = (e, item) => {
-    e.preventDefault(); e.stopPropagation();
-    const isFolder = !item.id;
-    const fullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
-    setCtxMenu({
-      x: e.clientX, y: e.clientY,
-      items: [
-        !isFolder && { label: 'Open File', icon: FileCode, action: () => onSelectFile(fullPath) },
-        { label: 'Rename', icon: Pencil, action: () => { setRenaming(item.name); setRenameValue(item.name); } },
-        'sep',
-        { label: 'Delete', icon: Trash2, danger: true, action: () => handleDelete(item) },
-      ].filter(Boolean),
-    });
-  };
-
-  const canGoBack = isAdmin ? currentPath !== '' : currentPath !== user.id;
-
-  return (
-    <div className="panel flex flex-col h-full" style={{ width: '250px' }}>
-      {/* Header */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-          {basename(currentPath) || (isAdmin ? 'ALL USERS' : 'WORKSPACE')}
-        </span>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button className="btn-icon" title="New File" onClick={() => setCreating('file')}><FilePlus size={13} /></button>
-          <button className="btn-icon" title="New Folder" onClick={() => setCreating('folder')}><FolderPlus size={13} /></button>
-          <button className="btn-icon" title="Refresh" onClick={fetchStorage}><RefreshCw size={13} /></button>
-        </div>
-      </div>
-
-      {/* Admin badge */}
-      {isAdmin && (
-        <div style={{ padding: '6px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Shield size={10} color="#f9e2af" />
-          <span className="admin-badge">ADMIN VIEW</span>
-        </div>
-      )}
-
-      {/* File list */}
-      <div className="flex-1 overflow-y-auto" style={{ paddingTop: '4px' }}>
-        {canGoBack && (
-          <div className="explorer-item" onClick={() => {
-            const parts = currentPath.split('/');
-            parts.pop();
-            setCurrentPath(parts.join('/'));
-          }}>
-            <ChevronRight size={13} style={{ transform: 'rotate(180deg)', color: 'var(--text-dim)' }} />
-            <span style={{ color: 'var(--text-dim)', fontSize: '11px' }}>..</span>
-          </div>
-        )}
-
-        {/* Inline create input */}
-        {creating && (
-          <form onSubmit={handleCreate} style={{ padding: '4px 12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {creating === 'file' ? <FileCode size={13} color="var(--accent-primary)" /> : <Folder size={13} color="#f9e2af" />}
-              <input
-                ref={newInputRef}
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                onBlur={() => { if (!newName) setCreating(null); }}
-                onKeyDown={e => { if (e.key === 'Escape') { setCreating(null); setNewName(''); } }}
-                placeholder={creating === 'file' ? 'filename.py' : 'folder-name'}
-                style={{ fontSize: '12px', flex: 1, borderBottom: '1px solid var(--accent-primary)' }}
-              />
-            </div>
-          </form>
-        )}
-
-        {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center' }}>
-            <div className="loading-spinner" style={{ margin: '0 auto' }} />
-          </div>
-        ) : items.length === 0 ? (
-          <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-dim)' }}>
-            Empty workspace.<br />Create a file to begin.
-          </div>
-        ) : (
-          items.map(item => {
-            const isFolder = !item.id;
-            const fullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
-            const isActive = !isFolder && activeFilePath === fullPath;
-            const lang = isFolder ? null : getLang(item.name);
-            const color = isFolder ? '#f9e2af' : getLangColor(lang);
-
-            if (renaming === item.name) {
-              return (
-                <form key={item.name} onSubmit={e => handleRename(e, item)} style={{ padding: '4px 12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {isFolder ? <Folder size={13} color="#f9e2af" /> : <FileCode size={13} color={color} />}
-                    <input
-                      ref={renameInputRef}
-                      value={renameValue}
-                      onChange={e => setRenameValue(e.target.value)}
-                      onBlur={() => setRenaming(null)}
-                      onKeyDown={e => { if (e.key === 'Escape') setRenaming(null); }}
-                      style={{ fontSize: '12px', flex: 1, borderBottom: '1px solid var(--accent-primary)' }}
-                    />
-                  </div>
-                </form>
-              );
-            }
-
-            return (
-              <div
-                key={item.name}
-                className={`explorer-item ${isActive ? 'selected' : ''}`}
-                onClick={() => isFolder ? setCurrentPath(fullPath) : onSelectFile(fullPath)}
-                onContextMenu={e => openContextMenu(e, item)}
-              >
-                {isFolder
-                  ? <Folder size={14} color={color} />
-                  : <FileCode size={14} color={color} />
-                }
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.name}
-                </span>
-                <div className="item-actions">
-                  {!isFolder && (
-                    <button className="item-action-btn" title="Rename" onClick={e => { e.stopPropagation(); setRenaming(item.name); setRenameValue(item.name); }}>
-                      <Pencil size={10} />
-                    </button>
-                  )}
-                  <button className="item-action-btn danger" title="Delete" onClick={e => { e.stopPropagation(); handleDelete(item); }}>
-                    <Trash2 size={10} />
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────
-//  SEARCH PANEL
-// ─────────────────────────────────────────────────────
-function SearchPanel({ tabs, onOpenTab }) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-
-  const doSearch = useCallback(async (q) => {
-    if (!q.trim()) { setResults([]); return; }
-    setSearching(true);
-    const found = [];
-    for (const tab of tabs) {
-      const lines = tab.content.split('\n');
-      lines.forEach((line, idx) => {
-        if (line.toLowerCase().includes(q.toLowerCase())) {
-          found.push({ path: tab.path, line: idx + 1, text: line.trim(), match: q });
-        }
-      });
-    }
-    setResults(found);
-    setSearching(false);
-  }, [tabs]);
-
-  useEffect(() => {
-    const t = setTimeout(() => doSearch(query), 300);
-    return () => clearTimeout(t);
-  }, [query, doSearch]);
-
-  const highlight = (text, match) => {
-    const idx = text.toLowerCase().indexOf(match.toLowerCase());
-    if (idx === -1) return text;
-    return (
-      <>
-        {text.slice(0, idx)}
-        <mark>{text.slice(idx, idx + match.length)}</mark>
-        {text.slice(idx + match.length)}
-      </>
-    );
-  };
-
-  return (
-    <div className="search-panel">
-      <div className="search-panel-header">SEARCH</div>
-      <div className="search-input-wrap">
-        <input
-          autoFocus
-          placeholder="Search in open files…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {searching && <div className="search-empty">Searching…</div>}
-        {!searching && query && results.length === 0 && (
-          <div className="search-empty">No results for "{query}"</div>
-        )}
-        {!searching && results.map((r, i) => (
-          <div key={i} className="search-result" onClick={() => onOpenTab(r.path)}>
-            <div className="search-result-file">{basename(r.path)} <span style={{ color: 'var(--text-dim)', fontSize: '9px' }}>:{r.line}</span></div>
-            <div className="search-result-line">{highlight(r.text, r.match)}</div>
-          </div>
-        ))}
-        {!query && (
-          <div className="search-empty" style={{ marginTop: '16px' }}>
-            <Search size={24} style={{ opacity: 0.2, margin: '0 auto 8px', display: 'block' }} />
-            Type to search across<br />all open files
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────
-//  SETTINGS PANEL
-// ─────────────────────────────────────────────────────
-function SettingsPanel({ settings, onUpdate }) {
-  return (
-    <div className="settings-panel">
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>SETTINGS</div>
-      </div>
-
-      <div className="settings-section">
-        <div className="settings-section-title">Editor</div>
-        <div className="settings-row">
-          <span className="settings-label">Font Size</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input type="range" className="settings-slider" min="10" max="22" value={settings.fontSize}
-              onChange={e => onUpdate('fontSize', +e.target.value)} />
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', width: '20px' }}>{settings.fontSize}</span>
-          </div>
-        </div>
-        <div className="settings-row">
-          <span className="settings-label">Word Wrap</span>
-          <button className={`settings-toggle ${settings.wordWrap === 'on' ? 'on' : ''}`}
-            onClick={() => onUpdate('wordWrap', settings.wordWrap === 'on' ? 'off' : 'on')} />
-        </div>
-        <div className="settings-row">
-          <span className="settings-label">Minimap</span>
-          <button className={`settings-toggle ${settings.minimap ? 'on' : ''}`}
-            onClick={() => onUpdate('minimap', !settings.minimap)} />
-        </div>
-        <div className="settings-row">
-          <span className="settings-label">Tab Size</span>
-          <select className="settings-select" value={settings.tabSize}
-            onChange={e => onUpdate('tabSize', +e.target.value)}>
-            <option value={2}>2</option>
-            <option value={4}>4</option>
-          </select>
-        </div>
-        <div className="settings-row">
-          <span className="settings-label">Theme</span>
-          <select className="settings-select" value={settings.theme}
-            onChange={e => onUpdate('theme', e.target.value)}>
-            <option value="vs-dark">Dark</option>
-            <option value="vs">Light</option>
-            <option value="hc-black">High Contrast</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="settings-section">
-        <div className="settings-section-title">Execution</div>
-        <div className="settings-row">
-          <span className="settings-label">Auto-save</span>
-          <button className={`settings-toggle ${settings.autoSave ? 'on' : ''}`}
-            onClick={() => onUpdate('autoSave', !settings.autoSave)} />
-        </div>
-      </div>
-
-      <div className="settings-section">
-        <div className="settings-section-title">Terminal</div>
-        <div className="settings-row">
-          <span className="settings-label">Font Size</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input type="range" className="settings-slider" min="10" max="18" value={settings.termFontSize}
-              onChange={e => onUpdate('termFontSize', +e.target.value)} />
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', width: '20px' }}>{settings.termFontSize}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────
 //  MAIN APP
 // ─────────────────────────────────────────────────────
 export default function App() {
-  const { user, signInWithGoogle, signOut, isAdmin } = useAuth();
+  const { user, signInWithGoogle, sendEmailCode, confirmEmailCode, signOut } = useAuth();
+  const isAdmin = isAdminUser(user);
 
   // --- Editor state ---
   const [tabs, setTabs] = useState([]); // { path, content, modified }
@@ -509,8 +87,8 @@ export default function App() {
   const [stdinValue, setStdinValue]       = useState('');
   const [terminalInput, setTerminalInput] = useState('');
   const [terminalHistory, setTerminalHistory] = useState([]);
-  const [terminalHistoryIndex, setTerminalHistoryIndex] = useState(-1);
-  const [terminalHeight, setTerminalHeight] = useState(240);
+  const terminalHistoryIndexRef = useRef(-1);
+  const terminalHeight = 240;
   const [paneMode, setPaneMode] = useState('split');
   const terminalRef  = useRef(null);
   const stdinRef     = useRef(null);
@@ -519,6 +97,7 @@ export default function App() {
   const pyodideStdinBuffersRef = useRef(null);
   const textEncoderRef = useRef(new TextEncoder());
   const completionSetupRef = useRef(new Set());
+  const fileSearchCacheRef = useRef({ at: 0, files: [] });
 
   // --- Cursor position ---
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
@@ -527,10 +106,16 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
 
   // --- Settings ---
-  const [settings, setSettings] = useState({
-    fontSize: 13, wordWrap: 'off', minimap: false,
-    tabSize: 2, theme: 'vs-dark', autoSave: false, termFontSize: 12,
+  const [settings, setSettings] = useState(() => {
+    try {
+      return { ...SETTINGS_DEFAULTS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
+    } catch {
+      return SETTINGS_DEFAULTS;
+    }
   });
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }, [settings]);
 
   // ── auto-scroll terminal
   useEffect(() => {
@@ -545,25 +130,6 @@ export default function App() {
   useEffect(() => () => {
     pyodideWorkerRef.current?.terminate();
   }, []);
-
-  // ── keyboard shortcuts
-  useEffect(() => {
-    const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        saveActiveFile();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [activeTabPath, tabs]);
-
-  // ── auto-save
-  useEffect(() => {
-    if (!settings.autoSave) return;
-    const t = setInterval(() => { if (activeTabPath) saveActiveFile(); }, 10000);
-    return () => clearInterval(t);
-  }, [settings.autoSave, activeTabPath]);
 
   // ─────────── Toast helpers ───────────
   const addToast = useCallback((type, message) => {
@@ -582,9 +148,13 @@ export default function App() {
       setActiveTabPath(path);
       return;
     }
-    const { data, error } = await supabase.storage.from('editor_files').download(path);
-    if (error) { addToast('error', error.message); return; }
-    const content = await data.text();
+    let content;
+    try {
+      content = await readFile(path);
+    } catch (err) {
+      addToast('error', err.message);
+      return;
+    }
     setTabs(prev => [...prev, { path, content, modified: false }]);
     setActiveTabPath(path);
   }, [tabs, addToast]);
@@ -603,11 +173,64 @@ export default function App() {
   const saveActiveFile = useCallback(async () => {
     if (!activeTabPath || !editorRef.current) return;
     const content = editorRef.current.getValue();
-    const { error } = await supabase.storage.from('editor_files').upload(activeTabPath, content, { upsert: true });
-    if (error) { addToast('error', 'Save failed: ' + error.message); return; }
+    try {
+      await writeFile(activeTabPath, content);
+    } catch (err) {
+      addToast('error', 'Save failed: ' + err.message);
+      return;
+    }
     setTabs(prev => prev.map(t => t.path === activeTabPath ? { ...t, content, modified: false } : t));
     addToast('success', `Saved ${basename(activeTabPath)}`);
   }, [activeTabPath, addToast]);
+
+  // ── keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveActiveFile();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [saveActiveFile]);
+
+  // ── auto-save
+  useEffect(() => {
+    if (!settings.autoSave) return;
+    const t = setInterval(() => { if (activeTabPath) saveActiveFile(); }, 10000);
+    return () => clearInterval(t);
+  }, [settings.autoSave, activeTabPath, saveActiveFile]);
+
+  // Keep open tabs pointing at the right file after a rename.
+  const handlePathsRenamed = useCallback((from, to) => {
+    const remap = (path) => path === from || path.startsWith(`${from}/`) ? to + path.slice(from.length) : path;
+    setTabs(prev => prev.map(t => ({ ...t, path: remap(t.path) })));
+    setActiveTabPath(prev => (prev ? remap(prev) : prev));
+  }, []);
+
+  // shortcut: 60s stale search cache, invalidate on save if live full-text search is needed.
+  const searchAllFiles = useCallback(async (query) => {
+    const q = query.toLowerCase();
+    if (Date.now() - fileSearchCacheRef.current.at > 60_000) {
+      const root = isAdmin ? '' : user.$id;
+      const paths = await listAllFiles(root);
+      const entries = await Promise.all(paths
+        .filter(path => !path.endsWith('/.keep'))
+        .map(async (path) => ({ path, content: await readFile(path) })));
+      fileSearchCacheRef.current = { at: Date.now(), files: entries };
+    }
+
+    const hits = [];
+    for (const file of fileSearchCacheRef.current.files) {
+      file.content.split('\n').forEach((line, idx) => {
+        if (line.toLowerCase().includes(q)) {
+          hits.push({ path: file.path, line: idx + 1, text: line.trim(), match: query });
+        }
+      });
+    }
+    return hits.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line);
+  }, [isAdmin, user]);
 
   const handleEditorChange = useCallback((value) => {
     setTabs(prev => prev.map(t => (
@@ -701,7 +324,7 @@ export default function App() {
       return pyodideWorkerReadyRef.current.promise;
     }
 
-    const worker = new Worker(new URL('./pyodide.worker.js', import.meta.url), { type: 'module' });
+    const worker = new Worker(new URL('./workers/pyodide.worker.js', import.meta.url), { type: 'module' });
     const controlBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2);
     const inputBuffer = new SharedArrayBuffer(PYODIDE_INPUT_BUFFER_SIZE);
 
@@ -754,49 +377,24 @@ export default function App() {
   const activeTab = tabs.find(t => t.path === activeTabPath);
   const lang = activeTab ? getLang(activeTab.path) : '';
 
-  const runLocallyLegacy = async () => {
+  const runInCloud = useCallback(async () => {
     if (!activeTab) return;
-    if (lang !== 'python') { addToast('info', 'Local execution only supports Python'); return; }
-    addLog('command', `▶  python ${basename(activeTab.path)}`);
+    if (!CODEX_LANG[lang]) { addToast('info', `Cloud run not supported for "${lang}"`); return; }
+    const code = editorRef.current?.getValue() || activeTab.content;
+    const provider = settings.cloudProvider;
+    addLog('command', `☁  ${provider === 'jdoodle' ? 'JDoodle' : 'OnlineCompiler'} run ${basename(activeTab.path)}`);
     setIsExecuting(true);
-    setStdinPending(false);
-    setStdinValue('');
     try {
-      await ensurePyodideWorker();
-        addLog('system', 'Loading Pyodide runtime…');
-      if (pyodideStdinBuffersRef.current) {
-        const { control, data } = pyodideStdinBuffersRef.current;
-        control.fill(0);
-        data.fill(0);
-      }
-      const code = editorRef.current?.getValue() || activeTab.content;
-      pyodideWorkerRef.current?.postMessage({ type: 'run', python: code });
+      const result = await runRemote({ provider, language: lang, code, input: '' });
+      if (result.output) addLog('stdout', result.output);
+      if (result.error) addLog('stderr', result.error);
+      if (!result.output && !result.error) addLog('system', 'Process exited with code 0.');
     } catch (e) {
-      addLog('stderr', e.message);
+      addLog('error', `Cloud failed: ${e.message}`);
+    } finally {
       setIsExecuting(false);
     }
-  };
-
-  const runInCloud = async () => {
-    if (!activeTab) return;
-    const codexLang = CODEX_LANG[lang];
-    if (!codexLang) { addToast('info', `Cloud run not supported for "${lang}"`); return; }
-    const code = editorRef.current?.getValue() || activeTab.content;
-    addLog('command', `☁  cloud run ${basename(activeTab.path)}`);
-    setIsExecuting(true);
-    try {
-      const res = await fetch('https://api.codex.jaagrav.in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ code, language: codexLang, input: '' }),
-      });
-      const json = await res.json();
-      if (json.output) addLog('stdout', json.output);
-      if (json.error)  addLog('stderr', json.error);
-      if (!json.output && !json.error) addLog('system', 'Process exited with code 0.');
-    } catch (e) { addLog('error', 'Cloud failed: ' + e.message); }
-    setIsExecuting(false);
-  };
+  }, [activeTab, lang, settings.cloudProvider, addLog, addToast]);
 
   const runPythonSource = useCallback(async (python, label) => {
     addLog('command', label);
@@ -805,7 +403,7 @@ export default function App() {
     setStdinValue('');
     try {
       await ensurePyodideWorker();
-      addLog('system', 'Loading Pyodide runtimeâ€¦');
+      addLog('system', 'Loading Pyodide runtime…');
       if (pyodideStdinBuffersRef.current) {
         const { control, data } = pyodideStdinBuffersRef.current;
         control.fill(0);
@@ -834,7 +432,7 @@ export default function App() {
 
     addLog('command', `${SHELL_PROMPT} $ ${input}`);
     setTerminalHistory(prev => [...prev.slice(-49), input]);
-    setTerminalHistoryIndex(-1);
+    terminalHistoryIndexRef.current = -1;
     setTerminalInput('');
 
     const [command = '', ...args] = parseCommand(input);
@@ -848,7 +446,7 @@ export default function App() {
     if (normalized === 'help') {
       addLog('stdout', [
         'Available commands:',
-        'help, clear, pwd, ls, tabs, open <path>, cat [path], run, python [file|-c "code"], save, echo <text>, history',
+        'help, clear, pwd, ls, tabs, open <path>, cat [path], run, cloud, python [file|-c "code"], save, echo <text>, history',
       ].join('\n'));
       return;
     }
@@ -921,6 +519,11 @@ export default function App() {
       return;
     }
 
+    if (normalized === 'cloud') {
+      await runInCloud();
+      return;
+    }
+
     if (normalized === 'python') {
       if (!args.length) {
         await runLocally();
@@ -953,7 +556,7 @@ export default function App() {
     }
 
     addLog('stderr', `Command not found: ${command}`);
-  }, [activeTab, activeTabPath, addLog, lang, openFile, runLocally, runPythonSource, saveActiveFile, tabs, terminalHistory]);
+  }, [activeTab, activeTabPath, addLog, lang, openFile, runInCloud, runLocally, runPythonSource, saveActiveFile, tabs, terminalHistory]);
 
   const clearTerminal = useCallback(() => {
     setTerminalLogs([{ type: 'system', text: '  Terminal cleared.' }]);
@@ -989,27 +592,25 @@ export default function App() {
 
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setTerminalHistoryIndex(prev => {
-        const nextIndex = prev < 0 ? terminalHistory.length - 1 : Math.max(0, prev - 1);
-        const nextValue = terminalHistory[nextIndex] ?? '';
-        setTerminalInput(nextValue);
-        return nextIndex;
-      });
+      const prev = terminalHistoryIndexRef.current;
+      const nextIndex = prev < 0 ? terminalHistory.length - 1 : Math.max(0, prev - 1);
+      terminalHistoryIndexRef.current = nextIndex;
+      setTerminalInput(terminalHistory[nextIndex] ?? '');
       return;
     }
 
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setTerminalHistoryIndex(prev => {
-        if (prev < 0) return -1;
-        const nextIndex = prev + 1;
-        if (nextIndex >= terminalHistory.length) {
-          setTerminalInput('');
-          return -1;
-        }
-        setTerminalInput(terminalHistory[nextIndex]);
-        return nextIndex;
-      });
+      const prev = terminalHistoryIndexRef.current;
+      if (prev < 0) return;
+      const nextIndex = prev + 1;
+      if (nextIndex >= terminalHistory.length) {
+        terminalHistoryIndexRef.current = -1;
+        setTerminalInput('');
+        return;
+      }
+      terminalHistoryIndexRef.current = nextIndex;
+      setTerminalInput(terminalHistory[nextIndex]);
     }
   }, [clearTerminal, handleTerminalCommand, stdinPending, submitStdin, terminalHistory, terminalInput]);
 
@@ -1023,12 +624,11 @@ export default function App() {
 
   // ─────────── Landing Page (unauthenticated) ───────────
   if (!user) {
-    return <LandingPage onSignIn={signInWithGoogle} />;
+    return <LandingPage onSignIn={signInWithGoogle} onSendCode={sendEmailCode} onVerify={confirmEmailCode} />;
   }
 
   // ─────────── IDE Layout ───────────
   const activeTabObj = tabs.find(t => t.path === activeTabPath);
-  const activeLang = activeTabObj ? getLang(activeTabObj.path) : '';
 
   return (
     <div className="app-container">
@@ -1061,7 +661,8 @@ export default function App() {
               <button onClick={saveActiveFile} className="btn-icon" title="Save (Ctrl+S)">
                 <Save size={14} color={activeTabObj?.modified ? 'var(--accent-primary)' : undefined} />
               </button>
-              <button onClick={runLocally} className="btn-primary" disabled={isExecuting} title="Run Locally">
+              <button onClick={runInCloud} className="btn-secondary" disabled={isExecuting} title="Run in Cloud (Python, JS, Java, C, C++)">☁  Run Cloud</button>
+              <button onClick={runLocally} className="btn-primary" disabled={isExecuting} title="Run Locally (Python)">
                 {isExecuting ? <span style={{ display:'flex', gap:'4px', alignItems:'center' }}><span className="loading-spinner" style={{width:10,height:10,borderWidth:1.5}} />Running</span> : '▶  Run Local'}
               </button>
             </>
@@ -1097,8 +698,8 @@ export default function App() {
         </div>
 
         {/* Side Panel */}
-        {activePanel === 'files'   && <FileExplorer isAdmin={isAdmin} user={user} onSelectFile={openFile} activeFilePath={activeTabPath} addToast={addToast} />}
-        {activePanel === 'search'  && <SearchPanel tabs={tabs} onOpenTab={openFile} />}
+        {activePanel === 'files'   && <FileExplorer isAdmin={isAdmin} user={user} onSelectFile={openFile} activeFilePath={activeTabPath} addToast={addToast} onPathsRenamed={handlePathsRenamed} />}
+        {activePanel === 'search'  && <SearchPanel tabs={tabs} onOpenTab={openFile} searchAllFiles={searchAllFiles} />}
         {activePanel === 'settings'&& <SettingsPanel settings={settings} onUpdate={updateSetting} />}
 
         {/* Editor + Terminal Area */}

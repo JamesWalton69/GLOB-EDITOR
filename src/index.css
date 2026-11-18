@@ -259,6 +259,22 @@ header::after {
 .btn-primary:active:not(:disabled)  { transform: translateY(0); }
 .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
+.btn-secondary {
+  background: var(--bg-glass-hover);
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 0.5px solid var(--border-hairline);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.btn-secondary:hover:not(:disabled) { background: rgba(10, 132, 255, 0.18); }
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
 /* ═══════════════════════════════════════════════════════
    EXPLORER ITEMS (frosted, rounded 8px, blue-tint selected)
 ═══════════════════════════════════════════════════════ */
