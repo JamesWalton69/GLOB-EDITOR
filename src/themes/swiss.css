@@ -1,0 +1,73 @@
+/* 5/5 — Swiss Grid: pure white, black rules, signal red, Helvetica. */
+html[data-ui="swiss"] {
+  color-scheme: light;
+  --color-paper: #ffffff;
+  --color-paper-2: #f4f4f4;
+  --color-paper-3: #eaeaea;
+  --color-ink: #111111;
+  --color-ink-2: #333333;
+  --color-muted: #444444;
+  --color-rule: #d6d6d6;
+  --color-rule-2: #999999;
+  --color-accent: #e2231a;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #fde9e8;
+  --color-focus: #e2231a;
+  --color-cool: #1a4fe2;
+  --color-cool-soft: #e8edfd;
+  --color-bad: #c01710;
+  --color-bad-soft: #fde9e8;
+  --color-ok: #167a4a;
+  --color-ok-soft: #e4f3ea;
+  --color-error: #c01710;
+  --color-success: #167a4a;
+  --font-display: Helvetica, Arial, sans-serif;
+  --font-body: Helvetica, Arial, sans-serif;
+  --font-outlier: "IBM Plex Mono", ui-monospace, monospace;
+  --display-weight: 700;
+
+  --bg-base: #ffffff;
+  --bg-dark: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-sidebar: #f4f4f4;
+  --bg-panel: #fafafa;
+  --bg-header: #ffffff;
+  --bg-glass: rgba(17, 17, 17, 0.03);
+  --bg-glass-hover: rgba(17, 17, 17, 0.07);
+  --bg-glass-active: rgba(226, 35, 26, 0.09);
+  --bg-item-hover: rgba(17, 17, 17, 0.05);
+  --bg-item-active: rgba(226, 35, 26, 0.11);
+  --text-main: #111111;
+  --text-muted: #444444;
+  --text-dim: #666666;
+  --accent-primary: #e2231a;
+  --accent-secondary: #1a4fe2;
+  --accent-success: #167a4a;
+  --accent-danger: #c01710;
+  --accent-warning: #9a6410;
+  --border-color: #d6d6d6;
+  --border-hairline: #cccccc;
+  --border-subtle: #e8e8e8;
+  --border-strong: #999999;
+  --shadow-panel: none;
+  --shadow-float: 0 0 0 1px #111111;
+  --shadow-card: none;
+  --accent-fg: #ffffff;
+  --accent-hover: #c01710;
+  --accent-ring: rgba(226, 35, 26, 0.14);
+  --editor-bg: #ffffff;
+  --ui-font: Helvetica, Arial, sans-serif;
+  --ui-font-code: "IBM Plex Mono", ui-monospace, monospace;
+  --ui-radius: 2px;
+  --ui-radius-sm: 0px;
+  --ui-shadow: 0 0 0 1px #111111;
+  --scrim: rgba(17, 17, 17, 0.35);
+  --scroll-thumb: #bdbdbd;
+  --scroll-thumb-hover: #777777;
+}
+html[data-ui="swiss"] header.glp-nav { border-bottom: 2px solid #111111; }
+html[data-ui="swiss"] .glp-navlinks a,
+html[data-ui="swiss"] .settings-section-title,
+html[data-ui="swiss"] .search-panel-header { text-transform: uppercase; letter-spacing: 0.08em; }
+html[data-ui="swiss"] .glp-table thead th { border-bottom: 2px solid #111111; }
+html[data-ui="swiss"] .glp-shot img { border: 1px solid #111111; }

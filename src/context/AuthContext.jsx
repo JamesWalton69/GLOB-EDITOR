@@ -4,17 +4,23 @@ import { account, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from '../lib/appwrite
 import { AuthContext } from '../lib/auth';
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Dev-only preview hooks: view the landing page or IDE with any UI style.
+  const params = new URLSearchParams(window.location.search);
+  const dev = import.meta.env.DEV;
+  const guest = dev && params.has('guest');
+  const demo = dev && params.has('demo');
+  const [user, setUser] = useState(() => demo ? { $id: 'demo-user', email: 'demo@example.com', name: 'Demo' } : null);
+  const [loading, setLoading] = useState(!(guest || demo));
 
   useEffect(() => {
+    if (guest || demo) return undefined;
     let mounted = true;
     account.get()
       .then((current) => { if (mounted) setUser(current); })
       .catch(() => { if (mounted) setUser(null); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
-  }, []);
+  }, [guest, demo]);
 
   // Popup + token flow. The token endpoint sends userId and secret to our own
   // callback page, so no third party cookie is needed to restore the session.

@@ -1,0 +1,73 @@
+/* 2/5 — Terminal Brutalist: monospace, acid lime, hard borders, zero radius. */
+html[data-ui="brutalist"] {
+  color-scheme: dark;
+  --color-paper: #0b0b0b;
+  --color-paper-2: #111111;
+  --color-paper-3: #171717;
+  --color-ink: #f4f4ee;
+  --color-ink-2: #cfcfc4;
+  --color-muted: #a8a89c;
+  --color-rule: #353535;
+  --color-rule-2: #555555;
+  --color-accent: #d8ff3e;
+  --color-accent-ink: #0b0b0b;
+  --color-accent-soft: #1e280a;
+  --color-focus: #d8ff3e;
+  --color-cool: #d8ff3e;
+  --color-cool-soft: #1e280a;
+  --color-bad: #ff5f56;
+  --color-bad-soft: #2a1110;
+  --color-ok: #d8ff3e;
+  --color-ok-soft: #1e280a;
+  --color-error: #ff5f56;
+  --color-success: #d8ff3e;
+  --font-display: "IBM Plex Mono", ui-monospace, monospace;
+  --font-body: "IBM Plex Mono", ui-monospace, monospace;
+  --font-outlier: "IBM Plex Mono", ui-monospace, monospace;
+  --display-weight: 600;
+
+  --bg-base: #0b0b0b;
+  --bg-dark: #0b0b0b;
+  --bg-surface: #111111;
+  --bg-sidebar: #0e0e0e;
+  --bg-panel: #101010;
+  --bg-header: #0d0d0d;
+  --bg-glass: rgba(216, 255, 62, 0.04);
+  --bg-glass-hover: rgba(216, 255, 62, 0.1);
+  --bg-glass-active: rgba(216, 255, 62, 0.16);
+  --bg-item-hover: rgba(216, 255, 62, 0.07);
+  --bg-item-active: rgba(216, 255, 62, 0.14);
+  --text-main: #f4f4ee;
+  --text-muted: #a8a89c;
+  --text-dim: #8a8a80;
+  --accent-primary: #d8ff3e;
+  --accent-secondary: #d8ff3e;
+  --accent-success: #d8ff3e;
+  --accent-danger: #ff5f56;
+  --accent-warning: #ffc845;
+  --border-color: #353535;
+  --border-hairline: #353535;
+  --border-subtle: #242424;
+  --border-strong: #6a6a60;
+  --shadow-panel: none;
+  --shadow-float: 0 0 0 1px #6a6a60;
+  --shadow-card: none;
+  --accent-fg: #0b0b0b;
+  --accent-hover: #b8e020;
+  --accent-ring: rgba(216, 255, 62, 0.18);
+  --editor-bg: #080808;
+  --ui-font: "IBM Plex Mono", ui-monospace, monospace;
+  --ui-font-code: "IBM Plex Mono", ui-monospace, monospace;
+  --ui-radius: 0px;
+  --ui-radius-sm: 0px;
+  --ui-shadow: 0 0 0 1px #6a6a60;
+  --scrim: rgba(0, 0, 0, 0.72);
+  --scroll-thumb: #444;
+  --scroll-thumb-hover: #777;
+}
+html[data-ui="brutalist"] * { border-radius: 0 !important; }
+html[data-ui="brutalist"] .glp-hero-copy h1,
+html[data-ui="brutalist"] .glp-close h2 { text-transform: uppercase; letter-spacing: -0.04em; }
+html[data-ui="brutalist"] .glp-table th,
+html[data-ui="brutalist"] .glp-table td { border-bottom: 1px solid var(--color-rule); }
+html[data-ui="brutalist"] .glp-shot img { border: 1px solid var(--color-rule-2); }

@@ -1,0 +1,73 @@
+/* 3/5 — Deep Ocean: navy, cyan, soft glow, generous rounding. */
+html[data-ui="ocean"] {
+  color-scheme: dark;
+  --color-paper: #0a1426;
+  --color-paper-2: #0e1b32;
+  --color-paper-3: #13223d;
+  --color-ink: #e9f2ff;
+  --color-ink-2: #b9c8e0;
+  --color-muted: #91a5c4;
+  --color-rule: #21304b;
+  --color-rule-2: #344667;
+  --color-accent: #43e0c4;
+  --color-accent-ink: #04251f;
+  --color-accent-soft: #123b38;
+  --color-focus: #43e0c4;
+  --color-cool: #6aa8ff;
+  --color-cool-soft: #142a47;
+  --color-bad: #ff7a85;
+  --color-bad-soft: #3a1c28;
+  --color-ok: #43e0c4;
+  --color-ok-soft: #123b38;
+  --color-error: #ff7a85;
+  --color-success: #43e0c4;
+  --font-display: "Space Grotesk", ui-sans-serif, sans-serif;
+  --font-body: "Space Grotesk", ui-sans-serif, sans-serif;
+  --font-outlier: "IBM Plex Mono", ui-monospace, monospace;
+  --display-weight: 500;
+
+  --bg-base: #0a1426;
+  --bg-dark: #0a1426;
+  --bg-surface: #0e1b32;
+  --bg-sidebar: #0c182c;
+  --bg-panel: #10203a;
+  --bg-header: #0c182c;
+  --bg-glass: rgba(67, 224, 196, 0.04);
+  --bg-glass-hover: rgba(67, 224, 196, 0.09);
+  --bg-glass-active: rgba(67, 224, 196, 0.14);
+  --bg-item-hover: rgba(106, 168, 255, 0.08);
+  --bg-item-active: rgba(67, 224, 196, 0.13);
+  --text-main: #e9f2ff;
+  --text-muted: #91a5c4;
+  --text-dim: #7b90b0;
+  --accent-primary: #43e0c4;
+  --accent-secondary: #6aa8ff;
+  --accent-success: #43e0c4;
+  --accent-danger: #ff7a85;
+  --accent-warning: #ffc96b;
+  --border-color: rgba(145, 165, 196, 0.16);
+  --border-hairline: rgba(145, 165, 196, 0.2);
+  --border-subtle: rgba(145, 165, 196, 0.1);
+  --border-strong: rgba(145, 165, 196, 0.32);
+  --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-float: 0 20px 50px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --accent-fg: #04251f;
+  --accent-hover: #6cf0d7;
+  --accent-ring: rgba(67, 224, 196, 0.18);
+  --editor-bg: #09162a;
+  --ui-font: "Space Grotesk", ui-sans-serif, sans-serif;
+  --ui-font-code: "IBM Plex Mono", ui-monospace, monospace;
+  --ui-radius: 14px;
+  --ui-radius-sm: 8px;
+  --ui-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  --scrim: rgba(4, 10, 20, 0.66);
+  --scroll-thumb: rgba(145, 165, 196, 0.28);
+  --scroll-thumb-hover: rgba(145, 165, 196, 0.45);
+}
+html[data-ui="ocean"] .app-container,
+html[data-ui="ocean"] .glp {
+  background-image:
+    radial-gradient(ellipse 60% 50% at 12% 0%, rgba(67, 224, 196, 0.09), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 95% 100%, rgba(106, 168, 255, 0.1), transparent 60%);
+}
