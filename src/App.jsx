@@ -11,6 +11,7 @@ import SearchPanel from './components/SearchPanel';
 import SettingsPanel from './components/SettingsPanel';
 import CommandPalette from './components/CommandPalette';
 import WelcomePanel from './components/WelcomePanel';
+import PreviewPanel from './components/PreviewPanel';
 import LandingPage from './components/LandingPage';
 import './App.css';
 import {
@@ -27,7 +28,12 @@ import Editor from '@monaco-editor/react';
 // ─────────────────────────────────────────────────────
 const CODEX_LANG = {
   python: 'python', javascript: 'javascript', typescript: 'typescript',
-  java: 'java', c: 'c', cpp: 'cpp', sql: 'sql',
+  java: 'java', c: 'c', cpp: 'cpp', sql: 'sql', html: 'html',
+};
+const LOCAL_LANG_LABELS = {
+  python: 'Python (Pyodide)',
+  javascript: 'JavaScript (Web Worker)',
+  html: 'HTML (sandboxed preview)',
 };
 const PYODIDE_INPUT_BUFFER_SIZE = 64 * 1024;
 const SETTINGS_KEY = 'globeditor.settings';
@@ -117,6 +123,7 @@ export default function App() {
   const [isExecuting, setIsExecuting]     = useState(false);
   const [stdinPending, setStdinPending]   = useState(false);
   const [stdinValue, setStdinValue]       = useState('');
+  const [preview, setPreview]             = useState(null);
   const [terminalInput, setTerminalInput] = useState('');
   const [terminalHistory, setTerminalHistory] = useState([]);
   const terminalHistoryIndexRef = useRef(-1);
@@ -125,6 +132,7 @@ export default function App() {
   const terminalRef  = useRef(null);
   const stdinRef     = useRef(null);
   const pyodideWorkerRef = useRef(null);
+  const jsWorkerRef = useRef(null);
   const pyodideWorkerReadyRef = useRef(null);
   const pyodideStdinBuffersRef = useRef(null);
   const textEncoderRef = useRef(new TextEncoder());
@@ -171,6 +179,7 @@ export default function App() {
 
   useEffect(() => () => {
     pyodideWorkerRef.current?.terminate();
+    jsWorkerRef.current?.terminate();
   }, []);
 
   // ─────────── Toast helpers ───────────
@@ -442,9 +451,14 @@ export default function App() {
     setIsExecuting(true);
     try {
       const result = await runRemote({ provider, language: lang, code, input: '' });
-      if (result.output) addLog('stdout', result.output);
-      if (result.error) addLog('stderr', result.error);
-      if (!result.output && !result.error) addLog('system', 'Process exited with code 0.');
+      if (result.preview) {
+        setPreview({ code: result.output, title: `${basename(activeTab.path)} (cloud)` });
+        addLog('system', `Opened HTML preview for ${basename(activeTab.path)}.`);
+      } else {
+        if (result.output) addLog('stdout', result.output);
+        if (result.error) addLog('stderr', result.error);
+        if (!result.output && !result.error) addLog('system', 'Process exited with code 0.');
+      }
     } catch (e) {
       addLog('error', `Cloud failed: ${e.message}`);
     } finally {
@@ -472,15 +486,48 @@ export default function App() {
     }
   }, [addLog, ensurePyodideWorker]);
 
+  const runJavaScriptSource = useCallback((code, label) => {
+    addLog('command', label);
+    setIsExecuting(true);
+    setStdinPending(false);
+    setStdinValue('');
+    try {
+      if (!jsWorkerRef.current) {
+        const worker = new Worker(new URL('./workers/js.worker.js', import.meta.url), { type: 'module' });
+        worker.addEventListener('message', handlePyodideWorkerMessage);
+        worker.addEventListener('error', (event) => {
+          addLog('stderr', event.message || 'JavaScript worker crashed.');
+          setIsExecuting(false);
+        });
+        jsWorkerRef.current = worker;
+      }
+      jsWorkerRef.current.postMessage({ type: 'run', code });
+    } catch (error) {
+      addLog('stderr', error.message);
+      setIsExecuting(false);
+    }
+  }, [addLog, handlePyodideWorkerMessage]);
+
   const runLocally = useCallback(async () => {
     if (!activeTab) return;
-    if (lang !== 'python') {
-      addToast('info', 'Local execution only supports Python files right now.');
-      return;
-    }
     const code = editorRef.current?.getValue() || activeTab.content;
-    await runPythonSource(code, `▶  python ${basename(activeTab.path)}`);
-  }, [activeTab, lang, addToast, runPythonSource]);
+    const name = basename(activeTab.path);
+
+    if (lang === 'python') {
+      await runPythonSource(code, `▶  python ${name}`);
+    } else if (lang === 'javascript') {
+      runJavaScriptSource(code, `▶  node ${name}`);
+    } else if (lang === 'html') {
+      setPreview({ code, title: name });
+      addLog('system', `Opened HTML preview for ${name}.`);
+    } else if (['java', 'c', 'cpp'].includes(lang)) {
+      const message = `Local runtime cannot compile ${lang.toUpperCase()}. Use Run Cloud for Java, C and C++.`;
+      addLog('stderr', message);
+      addToast('info', message);
+    } else {
+      addToast('info', `No local runner for "${lang}".`);
+    }
+  }, [activeTab, lang, addLog, addToast, runPythonSource, runJavaScriptSource]);
 
   const handleTerminalCommand = useCallback(async (rawValue) => {
     const input = rawValue.trim();
@@ -502,7 +549,8 @@ export default function App() {
     if (normalized === 'help') {
       addLog('stdout', [
         'Available commands:',
-        'help, clear, pwd, ls, tabs, open <path>, cat [path], run, cloud, python [file|-c "code"], save, echo <text>, history',
+        'help, clear, pwd, ls, tabs, open <path>, cat [path], run, preview, cloud, python [file|-c "code"], save, echo <text>, history',
+        'Local: Python, JavaScript, HTML preview. Cloud: Python, JS, TS, Java, C, C++, SQL, HTML preview.',
       ].join('\n'));
       return;
     }
@@ -571,6 +619,15 @@ export default function App() {
     }
 
     if (normalized === 'run') {
+      await runLocally();
+      return;
+    }
+
+    if (normalized === 'preview') {
+      if (lang !== 'html') {
+        addLog('stderr', 'Open an HTML file to use preview.');
+        return;
+      }
       await runLocally();
       return;
     }
@@ -722,8 +779,8 @@ export default function App() {
               <button onClick={saveActiveFile} className="btn-icon" title="Save (Ctrl+S)">
                 <Save size={14} color={activeTabObj?.modified ? 'var(--accent-primary)' : undefined} />
               </button>
-              <button onClick={runInCloud} className="btn-secondary" disabled={isExecuting} title="Run in Cloud (Python, JS, Java, C, C++)">☁  Run Cloud</button>
-              <button onClick={runLocally} className="btn-primary" disabled={isExecuting} title="Run Locally (Python)">
+              <button onClick={runInCloud} className="btn-secondary" disabled={isExecuting} title="Run in Cloud (Python, JS, TS, Java, C, C++, SQL, HTML)">☁  Run Cloud</button>
+              <button onClick={runLocally} className="btn-primary" disabled={isExecuting} title={`Run Locally (${Object.values(LOCAL_LANG_LABELS).map(l => l.split(' ')[0]).join(', ')})`}>
                 {isExecuting ? <span style={{ display:'flex', gap:'4px', alignItems:'center' }}><span className="loading-spinner" style={{width:10,height:10,borderWidth:1.5}} />Running</span> : '▶  Run Local'}
               </button>
             </>
@@ -936,6 +993,10 @@ export default function App() {
         {isExecuting && <div className="status-bar-item" style={{ color: '#a2e3a2' }}>⟳ Running…</div>}
       </div>
 
+      {preview && (
+        <PreviewPanel code={preview.code} title={preview.title} onClose={() => setPreview(null)} />
+      )}
+
       <CommandPalette
         key={paletteOpen ? 'palette-open' : 'palette-closed'}
         open={paletteOpen}
@@ -943,8 +1004,8 @@ export default function App() {
         files={paletteFiles}
         onOpenFile={openFile}
         actions={[
-          { id: 'run-local', label: 'Run locally (Python)', detail: 'Pyodide', icon: Play, run: runLocally },
-          { id: 'run-cloud', label: 'Run in cloud', detail: 'JDoodle / OnlineCompiler', icon: Cloud, run: runInCloud },
+          { id: 'run-local', label: 'Run locally (Python, JS, HTML)', detail: 'Pyodide / Web Worker / preview', icon: Play, run: runLocally },
+          { id: 'run-cloud', label: 'Run in cloud', detail: 'Python, JS, TS, Java, C, C++, SQL, HTML', icon: Cloud, run: runInCloud },
           { id: 'save', label: 'Save active file', icon: Save, run: saveActiveFile },
           {
             id: 'theme',

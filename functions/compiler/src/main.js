@@ -114,6 +114,19 @@ export default async function main(context) {
     return res.json({ error: 'Unknown provider' }, 400);
   }
 
+  // Neither provider executes HTML. Serve it back as a preview document so the
+  // editor can render it in a sandboxed iframe without shipping a browser engine.
+  if (language === 'html') {
+    return res.json({
+      provider: 'preview',
+      preview: true,
+      output: code,
+      statusCode: 200,
+      time: '',
+      memory: '',
+    }, 200);
+  }
+
   try {
     const result = provider === 'jdoodle'
       ? await runJdoodle(language, code, input)

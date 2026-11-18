@@ -34,7 +34,7 @@ const file = (name, content = '') => ({ name, content });
 const WORST_FILES = [
   file('Q3 Board Deck — FINAL (revised) v12 [approved by legal].pdf', longLine),
   file('IMG_20250914_183022_HDR_portrait_edited_edited.HEIC', 'camera roll'),
-  file('customer-feedback-from-enterprise-onboarding.js', 'onboarding'),
+  file('customer-feedback-from-enterprise-onboarding.js', 'console.log("hello from JavaScript"); console.error("js stderr works");'),
   file('王秀英.py', 'print("你好")'),
   file('نور الهدى عبد الرحمن.py', 'print("مرحبا")'),
   file('🦊 Fox.py', 'print("fox")'),
@@ -42,6 +42,9 @@ const WORST_FILES = [
   file('  Sam   Lee .py', 'spaces'),
   file('Đặng Thị Ngọc Hân.py', 'print("xin chào")'),
   file('a@b.test', 'shortest'),
+  file('preview.html', '<!doctype html><html><body style="font:16px system-ui;padding:24px"><h1>HTML preview works</h1><script>document.body.style.background="#eef4ff"</script></body></html>'),
+  file('Main.java', 'class Main { public static void main(String[] a) { System.out.println("java"); } }'),
+  file('main.c', '#include <stdio.h>\nint main(void){ printf("c\\n"); return 0; }'),
   file('undefined', 'no value'),
   file('NaN', 'not a number'),
   file('Workspaces/2026/Q4 Planning — Enterprise Rollout/Paramètres de confidentialité et de sécurité.md', 'long nested path'),
@@ -64,7 +67,7 @@ export const WORST_COPY = {
   closeTitle: 'Start with an empty file, or with a workspace containing 1,284 items',
   closeLead: 'Sign in with your email and the editor is ready. A six digit code arrives by email.',
   table: [
-    ['Local Python with Pyodide', 'In this browser tab, with Pyodide', 'Python'],
+    ['Local runtimes', 'In this browser tab — Pyodide, Web Worker and sandboxed preview', 'Python, JavaScript, HTML'],
     ['JDoodle enterprise cloud runner', 'Cloud sandbox — Invitation expired 12 days ago', 'Python, JavaScript, Java, C, C++, TypeScript, SQL, Rust, Go, PHP, Ruby, Swift, Kotlin'],
     ['OnlineCompiler.io', 'Cloud sandbox', 'customer-feedback-from-enterprise-onboarding-languages'],
   ],
@@ -96,5 +99,6 @@ export function fixturePaths(mode) {
 }
 
 export function fixtureContent(mode, path) {
-  return fixtureFiles(mode).find(f => f.name === path)?.content ?? '';
+  const clean = String(path).split('/').pop();
+  return fixtureFiles(mode).find(f => f.name === path || f.name.split('/').pop() === clean)?.content ?? '';
 }

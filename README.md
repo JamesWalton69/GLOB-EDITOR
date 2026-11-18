@@ -1,13 +1,14 @@
 # GlobEditor
 
-A browser-based cloud IDE: Monaco editor, multi-tab file management in Appwrite Storage, an in-browser Python runtime (Pyodide), and cloud compilation through an Appwrite Function backed by JDoodle and OnlineCompiler.io.
+A browser-based cloud IDE: Monaco editor, multi-tab file management in Appwrite Storage, local runtimes for Python (Pyodide), JavaScript (Web Worker) and HTML (sandboxed preview), plus cloud compilation through an Appwrite Function backed by JDoodle and OnlineCompiler.io.
 
 ## Stack
 
 - React 19 + Vite 8
 - Monaco Editor (`@monaco-editor/react`)
 - Appwrite (Google auth + private `editor_files` bucket + compiler Function)
-- Pyodide in a Web Worker for local Python execution
+- Pyodide in a Web Worker for local Python execution, a separate Web Worker for JavaScript, and a sandboxed iframe for HTML preview
+- Java, C and C++ run through the cloud runner; neither cloud provider executes HTML, so `.html` files are returned as a preview document
 - Lucide icons
 
 ## Setup
@@ -42,7 +43,7 @@ src/
   components/          Explorer, search, settings, toasts, context menu, landing page
   context/             AuthProvider
   lib/                 Appwrite client, auth, storage adapter, compiler client, helpers
-  workers/             Pyodide worker with shared-memory stdin
+  workers/             Pyodide worker with shared-memory stdin, JS worker
   App.css / index.css  Styles
 functions/compiler/    Server-side JDoodle / OnlineCompiler.io proxy
 ```

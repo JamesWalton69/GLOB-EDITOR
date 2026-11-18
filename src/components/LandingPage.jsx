@@ -5,7 +5,7 @@ import './LandingPage.css';
 
 const DEMO_COPY = {
   heroTitle: 'Code anywhere.\nSet up nowhere.',
-  heroLead: 'A full editor in your browser, with Python and cloud runners ready.',
+  heroLead: 'A full editor in your browser, with local Python, JavaScript and HTML preview, plus cloud runners ready.',
   runnersTitle: 'Two ways to run.',
   runnersLead: 'Python runs in this tab. Compiled languages run in a cloud sandbox.',
   rows: [
@@ -19,7 +19,7 @@ const DEMO_COPY = {
   closeTitle: 'Start with an empty file.',
   closeLead: 'Sign in with your email and the editor is ready.',
   table: [
-    ['Local Python', 'In this browser tab, with Pyodide', 'Python'],
+    ['Local runtimes', 'In this browser tab — Pyodide, Web Worker and sandboxed preview', 'Python, JavaScript, HTML'],
     ['JDoodle', 'Cloud sandbox', 'Python, JavaScript, Java, C, C++'],
     ['OnlineCompiler.io', 'Cloud sandbox', 'Python, TypeScript, Java, C, C++, SQL'],
   ],

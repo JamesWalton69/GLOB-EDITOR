@@ -50,7 +50,7 @@ Appwrite file IDs can't contain `/`, so the editor stores each file as:
 4. Set the function timeout to at least 30 seconds (compilation counts toward it).
 5. Copy the function ID into `VITE_APPWRITE_FUNCTION_ID`.
 
-The function only forwards the `language` values the editor knows. If JDoodle changes a `versionIndex`, edit `JDOODLE_LANG` in `functions/compiler/src/main.js` and redeploy. OnlineCompiler.io compiler ids come from `GET https://api.onlinecompiler.io/api/compilers/`.
+The function only forwards the `language` values the editor knows. If JDoodle changes a `versionIndex`, edit `JDOODLE_LANG` in `functions/compiler/src/main.js` and redeploy. OnlineCompiler.io compiler ids come from `GET https://api.onlinecompiler.io/api/compilers/`. HTML is special: neither provider executes markup, so the function returns the document as a `preview` payload and the editor renders it in a sandboxed iframe.
 
 ## 4. Admin (optional)
 
