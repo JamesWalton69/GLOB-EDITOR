@@ -14,8 +14,14 @@ document.documentElement.dataset.ui = initial;
 
 export const getUI = () => document.documentElement.dataset.ui;
 
+export const isDarkStyle = (id = getUI()) => ['brutalist', 'ocean'].includes(id);
+
+// Monaco cannot be themed from CSS, so derive its fallback from the active style.
+export const getMonacoTheme = () => isDarkStyle() ? 'vs-dark' : 'vs';
+
 export function setUI(id) {
   if (!valid.has(id)) return;
   document.documentElement.dataset.ui = id;
   localStorage.setItem('globeditor.ui', id);
+  window.dispatchEvent(new CustomEvent('globeditor:ui-change'));
 }

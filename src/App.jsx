@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, isAdminUser } from './lib/auth';
 import { listAllFiles, readFile, writeFile } from './lib/storage';
-import { runRemote } from './lib/compiler';
+import { PROVIDERS, runRemote } from './lib/compiler';
+import { getMonacoTheme } from './theme.js';
 import { getLang, getLangColor, basename } from './lib/editor';
+import { getMode, WORST_LOGS, WORST_TOAST } from './lib/fixture';
 import ToastContainer from './components/ToastContainer';
 import FileExplorer from './components/FileExplorer';
 import SearchPanel from './components/SearchPanel';
@@ -31,8 +33,30 @@ const PYODIDE_INPUT_BUFFER_SIZE = 64 * 1024;
 const SETTINGS_KEY = 'globeditor.settings';
 const SETTINGS_DEFAULTS = {
   fontSize: 13, wordWrap: 'off', minimap: false,
-  tabSize: 2, theme: 'vs', autoSave: false, termFontSize: 12,
+  tabSize: 2, theme: 'auto', autoSave: false, termFontSize: 12,
   cloudProvider: 'jdoodle',
+};
+
+const sanitizeSettings = (raw) => {
+  const merged = { ...SETTINGS_DEFAULTS, ...(raw || {}) };
+  const bounded = (value, min, max, fallback) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= min && n <= max ? Math.round(n) : fallback;
+  };
+  return {
+    ...merged,
+    fontSize: bounded(merged.fontSize, 10, 22, SETTINGS_DEFAULTS.fontSize),
+    termFontSize: bounded(merged.termFontSize, 10, 18, SETTINGS_DEFAULTS.termFontSize),
+    tabSize: [2, 4].includes(Number(merged.tabSize)) ? Number(merged.tabSize) : SETTINGS_DEFAULTS.tabSize,
+    // 'vs' was the old default, not a deliberate choice — migrate it to style-following.
+    theme: merged.theme === 'vs' ? 'auto'
+      : ['auto', 'vs-dark', 'hc-black'].includes(merged.theme) ? merged.theme : SETTINGS_DEFAULTS.theme,
+    wordWrap: merged.wordWrap === 'on' ? 'on' : 'off',
+    minimap: merged.minimap === true,
+    autoSave: merged.autoSave === true,
+    cloudProvider: PROVIDERS.some(p => p.id === merged.cloudProvider)
+      ? merged.cloudProvider : SETTINGS_DEFAULTS.cloudProvider,
+  };
 };
 
 const SHELL_PROMPT = 'workspace';
@@ -86,7 +110,10 @@ export default function App() {
   const editorInstanceRef = useRef(null); // monaco editor instance
 
   // --- Terminal state ---
-  const [terminalLogs, setTerminalLogs]   = useState([{ type: 'system', text: '  GlobEditor Terminal v2.0 — Ready.' }]);
+  const [terminalLogs, setTerminalLogs]   = useState(() => [
+    { type: 'system', text: '  GlobEditor Terminal v2.0 — Ready.' },
+    ...(import.meta.env.DEV && getMode() === 'worst' ? WORST_LOGS : []),
+  ]);
   const [isExecuting, setIsExecuting]     = useState(false);
   const [stdinPending, setStdinPending]   = useState(false);
   const [stdinValue, setStdinValue]       = useState('');
@@ -108,16 +135,26 @@ export default function App() {
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
 
   // --- Toasts ---
-  const [toasts, setToasts] = useState([]);
+  const [toasts, setToasts] = useState(() => (
+    import.meta.env.DEV && getMode() === 'worst'
+      ? [{ id: -1, type: WORST_TOAST.type, message: WORST_TOAST.message }]
+      : []
+  ));
 
   // --- Settings ---
   const [settings, setSettings] = useState(() => {
     try {
-      return { ...SETTINGS_DEFAULTS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
+      return sanitizeSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'));
     } catch {
       return SETTINGS_DEFAULTS;
     }
   });
+  const [styleTick, setStyleTick] = useState(0);
+  useEffect(() => {
+    const onStyleChange = () => setStyleTick(tick => tick + 1);
+    window.addEventListener('globeditor:ui-change', onStyleChange);
+    return () => window.removeEventListener('globeditor:ui-change', onStyleChange);
+  }, []);
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }, [settings]);
@@ -648,28 +685,32 @@ export default function App() {
 
   // ─────────── IDE Layout ───────────
   const activeTabObj = tabs.find(t => t.path === activeTabPath);
+  const effectiveTheme = settings.theme === 'auto' ? getMonacoTheme() : settings.theme;
 
   return (
-    <div className="app-container">
+    <div className="app-container" data-style-tick={styleTick}>
       {/* ─── Header ─── */}
       <header>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
           <div style={{
-            width: '24px', height: '24px', borderRadius: '6px',
+            width: '24px', height: '24px', borderRadius: '6px', flexShrink: 0,
             background: 'linear-gradient(135deg, #0071e3, #0a84ff)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <Code size={13} color="white" />
           </div>
-          <span style={{ fontSize: '13px', fontWeight: '600' }}>GlobEditor</span>
+          <span style={{ fontSize: '13px', fontWeight: '600', flexShrink: 0 }}>GlobEditor</span>
           {activeTabObj && (
-            <>
-              <span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>/</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            <span className="header-file-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <span style={{ color: 'var(--text-dim)', fontSize: '12px', flexShrink: 0 }}>/</span>
+              <span
+                title={basename(activeTabObj.path)}
+                style={{ fontSize: '12px', color: 'var(--text-muted)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
                 {basename(activeTabObj.path)}
                 {activeTabObj.modified && <span style={{ color: 'var(--accent-primary)', marginLeft: '4px' }}>●</span>}
               </span>
-            </>
+            </span>
           )}
         </div>
 
@@ -688,7 +729,7 @@ export default function App() {
             </>
           )}
           {isAdmin && <span className="admin-badge" style={{ marginLeft: '4px' }}>ADMIN</span>}
-          <span style={{ fontSize: '11px', color: 'var(--text-dim)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="header-email" title={user.email} style={{ fontSize: '11px', color: 'var(--text-dim)', maxWidth: '180px', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {user.email}
           </span>
           <button className="btn-icon" onClick={signOut} title="Sign out"><LogOut size={15} /></button>
@@ -734,7 +775,7 @@ export default function App() {
                 onClick={() => setActiveTabPath(tab.path)}
               >
                 <FileCode size={12} color={getLangColor(getLang(tab.path))} style={{ flexShrink: 0 }} />
-                <span className="tab-name">{basename(tab.path)}</span>
+                <span className="tab-name" title={basename(tab.path)}>{basename(tab.path)}</span>
                 {tab.modified
                   ? <span className="tab-modified-dot" />
                   : <span className="tab-close" onClick={e => closeTab(tab.path, e)}><X size={10} /></span>
@@ -763,7 +804,7 @@ export default function App() {
               <Editor
                 key={activeTabPath}
                 height="100%"
-                theme={settings.theme}
+                theme={effectiveTheme}
                 language={getLang(activeTabObj.path)}
                 value={activeTabObj.content}
                 onMount={handleEditorDidMount}
@@ -823,7 +864,7 @@ export default function App() {
             <div ref={terminalRef} onMouseDown={() => stdinRef.current?.focus()} style={{
               flex: 1, overflowY: 'auto', padding: '8px 20px',
               fontFamily: "'Fira Code', monospace", fontSize: settings.termFontSize,
-              lineHeight: '1.75',
+              lineHeight: '1.75', overflowWrap: 'anywhere',
             }}>
               {terminalLogs.map((log, i) => {
                 const colors = {
@@ -836,7 +877,7 @@ export default function App() {
                   'stdin-value':  'var(--accent-success)',
                 };
                 return (
-                  <div key={i} style={{ color: colors[log.type] || 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  <div key={i} style={{ color: colors[log.type] || 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
                     {log.text}
                   </div>
                 );
@@ -872,7 +913,7 @@ export default function App() {
         </div>
         {activeTabObj && (
           <>
-            <div className="status-bar-item" style={{ color: 'white' }}>
+            <div className="status-bar-item status-bar-file" title={basename(activeTabObj.path)} style={{ color: 'white' }}>
               {basename(activeTabObj.path)}
             </div>
             <div className="status-bar-item">
@@ -907,9 +948,9 @@ export default function App() {
           { id: 'save', label: 'Save active file', icon: Save, run: saveActiveFile },
           {
             id: 'theme',
-            label: settings.theme === 'vs' ? 'Switch to dark editor' : 'Switch to light editor',
-            icon: settings.theme === 'vs' ? Moon : Sun,
-            run: () => updateSetting('theme', settings.theme === 'vs' ? 'vs-dark' : 'vs'),
+            label: effectiveTheme === 'vs' ? 'Switch to dark editor' : 'Switch to light editor',
+            icon: effectiveTheme === 'vs' ? Moon : Sun,
+            run: () => updateSetting('theme', effectiveTheme === 'vs' ? 'vs-dark' : 'vs'),
           },
         ]}
       />

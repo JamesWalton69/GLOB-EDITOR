@@ -40,6 +40,7 @@ export default function SettingsPanel({ settings, onUpdate }) {
           <span className="settings-label">Theme</span>
           <select className="settings-select" value={settings.theme}
             onChange={e => onUpdate('theme', e.target.value)}>
+            <option value="auto">Follow UI style</option>
             <option value="vs-dark">Dark</option>
             <option value="vs">Light</option>
             <option value="hc-black">High Contrast</option>

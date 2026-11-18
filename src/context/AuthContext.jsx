@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ID } from 'appwrite';
 import { account, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from '../lib/appwrite';
 import { AuthContext } from '../lib/auth';
+import { getMode, WORST_USER } from '../lib/fixture';
 
 export const AuthProvider = ({ children }) => {
   // Dev-only preview hooks: view the landing page or IDE with any UI style.
@@ -9,7 +10,10 @@ export const AuthProvider = ({ children }) => {
   const dev = import.meta.env.DEV;
   const guest = dev && params.has('guest');
   const demo = dev && params.has('demo');
-  const [user, setUser] = useState(() => demo ? { $id: 'demo-user', email: 'demo@example.com', name: 'Demo' } : null);
+  const [user, setUser] = useState(() => {
+    if (!demo) return null;
+    return getMode() === 'worst' ? WORST_USER : { $id: 'demo-user', email: 'demo@example.com', name: 'Demo' };
+  });
   const [loading, setLoading] = useState(!(guest || demo));
 
   useEffect(() => {

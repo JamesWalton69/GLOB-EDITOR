@@ -1,5 +1,9 @@
 import { ID, Query, Permission, Role } from 'appwrite';
 import { account, storage, APPWRITE_BUCKET_ID, ADMIN_USER_ID } from './appwrite';
+import { getMode, fixtureMetas, fixturePaths, fixtureContent } from './fixture';
+
+// Dev-only: swap the read boundary so the worst-case data enters exactly where real files do.
+const fixtureActive = () => getMode() !== 'demo';
 
 const BUCKET = APPWRITE_BUCKET_ID;
 const PAGE_SIZE = 100;
@@ -54,7 +58,24 @@ export async function findFile(path) {
 // Returns the immediate children of a virtual folder. Appwrite folders are just a
 // `folder` string on each file, so subfolders are derived from the stored paths.
 export async function listDirectory(path = '') {
-  const current = norm(path);
+  const current = fixtureActive() ? '' : norm(path);
+  if (fixtureActive()) {
+    const metas = fixtureMetas(getMode());
+    const folders = new Set();
+    metas.forEach((file) => {
+      const folder = norm(file.folder);
+      if (current && folder !== current && !folder.startsWith(`${current}/`)) return;
+      const rest = current ? folder.slice(current.length + 1) : folder;
+      if (rest) folders.add(rest.split('/')[0]);
+    });
+    return [
+      ...[...folders].sort().map(name => ({ name, id: null })),
+      ...metas
+        .filter(file => norm(file.folder) === current)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(file => ({ name: file.name, id: file.$id })),
+    ];
+  }
   const files = await allFiles();
   const folders = new Set();
 
@@ -76,6 +97,7 @@ export async function listDirectory(path = '') {
 
 export async function listAllFiles(prefix = '') {
   const base = norm(prefix);
+  if (fixtureActive()) return fixturePaths(getMode(), base);
   const files = await allFiles();
   return files
     .map(metaPath)
@@ -83,6 +105,7 @@ export async function listAllFiles(prefix = '') {
 }
 
 export async function readFile(path) {
+  if (fixtureActive()) return fixtureContent(getMode(), path);
   const file = await findFile(path);
   if (!file) throw new Error(`File not found: ${path}`);
 
@@ -98,6 +121,7 @@ export async function readFile(path) {
 }
 
 export async function writeFile(path, content, { overwrite = true } = {}) {
+  if (fixtureActive()) throw new Error('Fixture mode is read-only.');
   const { folder, name } = splitPath(path);
   if (!name) throw new Error('Invalid file path');
 
@@ -116,10 +140,12 @@ export async function writeFile(path, content, { overwrite = true } = {}) {
 }
 
 export async function createFolder(path) {
+  if (fixtureActive()) throw new Error('Fixture mode is read-only.');
   await writeFile(`${norm(path)}/.keep`, '', { overwrite: false });
 }
 
 export async function deletePath(path) {
+  if (fixtureActive()) throw new Error('Fixture mode is read-only.');
   const target = norm(path);
   const files = await allFiles();
   const victims = files.filter((file) => {
@@ -132,6 +158,7 @@ export async function deletePath(path) {
 }
 
 export async function renamePath(from, to) {
+  if (fixtureActive()) throw new Error('Fixture mode is read-only.');
   const oldBase = norm(from);
   const newBase = norm(to);
   if (!oldBase || !newBase || oldBase === newBase) throw new Error('Invalid rename');

@@ -99,6 +99,7 @@ header::after, .tab-bar::before { display: none; }
   box-shadow: none;
 }
 .btn-icon.active { background: var(--accent-primary); color: var(--accent-fg); box-shadow: none; }
+.btn-primary, .btn-secondary, .glp-btn { white-space: nowrap; }
 .btn-icon:active { transform: scale(0.96); }
 .btn-primary {
   background: var(--accent-primary); color: var(--accent-fg);
@@ -145,6 +146,13 @@ header::after, .tab-bar::before { display: none; }
 .settings-slider { background: var(--border-strong); box-shadow: none; }
 .settings-slider::-webkit-slider-thumb { background: var(--accent-primary); box-shadow: none; }
 .status-bar { background: var(--bg-header); border-top: 1px solid var(--border-color); box-shadow: none; }
+.status-bar-item { flex-shrink: 0; }
+.status-bar-file { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 40rem) {
+  .status-bar-file { flex: 1 1 auto; }
+  .status-bar-item:not(:first-child):not(.status-bar-file) { display: none; }
+  .header-file-group, .header-email { display: none; }
+}
 .status-bar-item.clickable:hover { background: var(--bg-glass-hover); }
 .status-bar-error { background: var(--accent-danger) !important; }
 .terminal { background: var(--editor-bg); color: var(--text-main); box-shadow: none; }
@@ -162,6 +170,7 @@ header::after, .tab-bar::before { display: none; }
 .toast {
   background: var(--bg-surface); border: 1px solid var(--border-color);
   border-radius: var(--ui-radius); box-shadow: var(--ui-shadow);
+  max-width: min(420px, calc(100vw - 32px)); overflow-wrap: anywhere;
 }
 .toast.success { box-shadow: var(--ui-shadow), inset 3px 0 0 var(--accent-success); }
 .toast.error { box-shadow: var(--ui-shadow), inset 3px 0 0 var(--accent-danger); }
@@ -238,6 +247,10 @@ header::after, .tab-bar::before { display: none; }
 .terminal:hover ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); }
 
 /* ── Landing structure ───────────────────────────────── */
+.glp-hero-copy h1, .glp-close h2, .glp-tagline { hyphens: auto; overflow-wrap: anywhere; }
+[dir="rtl"] .terminal, [dir="rtl"] .monaco-editor, [dir="rtl"] .cmd-search input {
+  direction: ltr; text-align: left;
+}
 header.glp-nav { border-bottom: 1px solid var(--color-rule); }
 .glp-hero-copy h1::before {
   content: ''; display: block; width: 48px; height: 3px;
@@ -251,6 +264,7 @@ header.glp-nav { border-bottom: 1px solid var(--color-rule); }
 }
 .glp-btn:active, .glp-nav-signin:active, .lp-modal-btn:active { transform: scale(0.97); }
 .lp-modal { box-shadow: var(--ui-shadow); }
+.lp-modal-sub strong { overflow-wrap: anywhere; }
 
 /* Two CSS-only planes give the product shot real depth. */
 .glp-hero-stage { position: relative; perspective: 1200px; transform-style: preserve-3d; }
@@ -275,6 +289,18 @@ header.glp-nav { border-bottom: 1px solid var(--color-rule); }
   .glp-stage-card { display: none; }
   .glp-shot { transform: none; }
 }
+
+/* ── Dev-only worst-case data toggle: plain chrome, bottom-center ── */
+.data-toggle {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 10003;
+  display: flex; gap: 2px; padding: 3px; border-radius: 6px;
+  background: #d1d5db; font-family: system-ui, sans-serif;
+}
+.data-toggle button {
+  padding: 5px 9px; border: 0; border-radius: 4px; background: transparent;
+  color: #111827; font-size: 11px; cursor: pointer;
+}
+.data-toggle button.active { background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); }
 
 /* ── Style switcher (test harness, works signed in or out) ── */
 .ui-switcher { position: fixed; left: 16px; bottom: 16px; z-index: 10002; font-family: var(--ui-font); }

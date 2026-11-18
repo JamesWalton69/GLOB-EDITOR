@@ -89,6 +89,7 @@ export default function EmailSignIn({ onSendCode, onVerify, onGoogle, onClose })
                 ref={emailRef}
                 className="lp-field"
                 type="email"
+                maxLength={254}
                 autoComplete="email"
                 placeholder="you@example.com"
                 value={email}

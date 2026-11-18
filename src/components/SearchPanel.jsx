@@ -76,8 +76,8 @@ export default function SearchPanel({ tabs, onOpenTab, searchAllFiles }) {
         )}
         {!searching && results.map((r, i) => (
           <div key={i} className="search-result" onClick={() => onOpenTab(r.path)}>
-            <div className="search-result-file">{basename(r.path)} <span style={{ color: 'var(--text-dim)', fontSize: '9px' }}>:{r.line}</span></div>
-            <div className="search-result-line">{highlight(r.text, r.match)}</div>
+            <div className="search-result-file" title={r.path} dir="auto">{basename(r.path)} <span style={{ color: 'var(--text-dim)', fontSize: '9px' }}>:{r.line}</span></div>
+            <div className="search-result-line" title={r.text} dir="auto">{highlight(r.text, r.match)}</div>
           </div>
         ))}
         {!query && (

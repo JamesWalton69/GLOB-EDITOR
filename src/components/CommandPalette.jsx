@@ -58,6 +58,8 @@ export default function CommandPalette({ open, onClose, files = [], actions = []
               role="option"
               aria-selected={i === index}
               className={`cmd-item ${i === index ? 'selected' : ''}`}
+              title={`${item.label}${item.detail ? ` — ${item.detail}` : ''}`}
+              dir="auto"
               onMouseEnter={() => setIndex(i)}
               onClick={() => choose(item)}
             >

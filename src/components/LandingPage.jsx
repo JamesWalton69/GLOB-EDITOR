@@ -1,11 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react';
 import EmailSignIn from './EmailSignIn';
+import { getMode, WORST_COPY } from '../lib/fixture';
 import './LandingPage.css';
 
-const WORDS = 'One tab for the code, the files and the run.'.split(' ');
+const DEMO_COPY = {
+  heroTitle: 'Code anywhere.\nSet up nowhere.',
+  heroLead: 'A full editor in your browser, with Python and cloud runners ready.',
+  runnersTitle: 'Two ways to run.',
+  runnersLead: 'Python runs in this tab. Compiled languages run in a cloud sandbox.',
+  rows: [
+    ['Monaco editor', 'Syntax highlighting, completions and a command palette from VS Code.'],
+    ['Tabs and folders', 'Open several files, create folders, rename and delete from the tree.'],
+    ['Search across files', 'Find a line in your open tabs, or across the whole workspace.'],
+    ['Integrated terminal', 'Run commands, inspect output and answer program input in the page.'],
+    ['Email code sign in', 'A six digit code arrives by email. There is no password to remember.'],
+  ],
+  tagline: 'One tab for the code, the files and the run.',
+  closeTitle: 'Start with an empty file.',
+  closeLead: 'Sign in with your email and the editor is ready.',
+  table: [
+    ['Local Python', 'In this browser tab, with Pyodide', 'Python'],
+    ['JDoodle', 'Cloud sandbox', 'Python, JavaScript, Java, C, C++'],
+    ['OnlineCompiler.io', 'Cloud sandbox', 'Python, TypeScript, Java, C, C++, SQL'],
+  ],
+};
 
-function Tagline() {
+function Tagline({ text }) {
   const wrapRef = useRef(null);
+  const words = text.split(' ');
 
   useEffect(() => {
     const root = wrapRef.current;
@@ -13,7 +35,7 @@ function Tagline() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     root.classList.add('js');
 
-    const words = Array.from(root.querySelectorAll('.glp-word'));
+    const spans = Array.from(root.querySelectorAll('.glp-word'));
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -22,15 +44,15 @@ function Tagline() {
         }
       });
     }, { threshold: 0.6 });
-    words.forEach((word) => observer.observe(word));
+    spans.forEach(span => observer.observe(span));
     return () => observer.disconnect();
-  }, []);
+  }, [text]);
 
   return (
     <p className="glp-tagline" ref={wrapRef}>
-      {WORDS.map((word, i) => (
+      {words.map((word, i) => (
         <React.Fragment key={i}>
-          <span className="glp-word">{word}</span>{i < WORDS.length - 1 ? ' ' : ''}
+          <span className="glp-word">{word}</span>{i < words.length - 1 ? ' ' : ''}
         </React.Fragment>
       ))}
     </p>
@@ -39,6 +61,7 @@ function Tagline() {
 
 export default function LandingPage({ onSignIn, onSendCode, onVerify }) {
   const [emailOpen, setEmailOpen] = useState(false);
+  const copy = import.meta.env.DEV && getMode() === 'worst' ? WORST_COPY : DEMO_COPY;
 
   useEffect(() => {
     const onKey = (event) => { if (event.key === 'Escape') setEmailOpen(false); };
@@ -65,8 +88,10 @@ export default function LandingPage({ onSignIn, onSendCode, onVerify }) {
         <section className="glp-hero" id="top">
           <div className="container glp-hero-grid">
             <div className="glp-hero-copy">
-              <h1>Code anywhere.<br />Set up nowhere.</h1>
-              <p className="lead">A full editor in your browser, with Python and cloud runners ready.</p>
+              <h1>{copy.heroTitle.split('\n').map((line, i) => (
+                <React.Fragment key={i}>{i > 0 && <br />}{line}</React.Fragment>
+              ))}</h1>
+              <p className="lead">{copy.heroLead}</p>
               <div className="glp-actions">
                 <button type="button" className="glp-btn glp-btn-primary" onClick={() => setEmailOpen(true)}>Open the editor</button>
                 <a className="glp-btn glp-btn-quiet" href="#runners">See how it runs</a>
@@ -92,8 +117,8 @@ export default function LandingPage({ onSignIn, onSendCode, onVerify }) {
         <section className="glp-runners" id="runners">
           <div className="container">
             <div className="glp-headsplit">
-              <h2>Two ways to run.</h2>
-              <p className="lead">Python runs in this tab. Compiled languages run in a cloud sandbox.</p>
+              <h2>{copy.runnersTitle}</h2>
+              <p className="lead">{copy.runnersLead}</p>
             </div>
             <table className="glp-table">
               <caption className="visually-hidden">Where each language runs in GlobEditor</caption>
@@ -105,21 +130,13 @@ export default function LandingPage({ onSignIn, onSendCode, onVerify }) {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <th scope="row">Local Python</th>
-                  <td>In this browser tab, with Pyodide</td>
-                  <td className="num">Python</td>
-                </tr>
-                <tr>
-                  <th scope="row">JDoodle</th>
-                  <td>Cloud sandbox</td>
-                  <td className="num">Python, JavaScript, Java, C, C++</td>
-                </tr>
-                <tr>
-                  <th scope="row">OnlineCompiler.io</th>
-                  <td>Cloud sandbox</td>
-                  <td className="num">Python, TypeScript, Java, C, C++, SQL</td>
-                </tr>
+                {copy.table.map(([name, where, languages], i) => (
+                  <tr key={i}>
+                    <th scope="row">{name}</th>
+                    <td>{where}</td>
+                    <td className="num">{languages}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -132,40 +149,24 @@ export default function LandingPage({ onSignIn, onSendCode, onVerify }) {
               <p className="lead">The editor keeps the files, the run and the output together.</p>
             </div>
             <div className="glp-rows">
-              <div className="glp-row">
-                <h3>Monaco editor</h3>
-                <p>Syntax highlighting, completions and a command palette from VS Code.</p>
-              </div>
-              <div className="glp-row">
-                <h3>Tabs and folders</h3>
-                <p>Open several files, create folders, rename and delete from the tree.</p>
-              </div>
-              <div className="glp-row">
-                <h3>Search across files</h3>
-                <p>Find a line in your open tabs, or across the whole workspace.</p>
-              </div>
-              <div className="glp-row">
-                <h3>Integrated terminal</h3>
-                <p>Run commands, inspect output and answer program input in the page.</p>
-              </div>
-              <div className="glp-row">
-                <h3>Email code sign in</h3>
-                <p>A six digit code arrives by email. There is no password to remember.</p>
-              </div>
+              {copy.rows.map(([title, description], i) => (
+                <div className="glp-row" key={i}>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
         <section className="glp-tagline-section" id="about">
-          <div className="container">
-            <Tagline />
-          </div>
+          <div className="container"><Tagline text={copy.tagline} /></div>
         </section>
 
         <section className="glp-close">
           <div className="container glp-close-inner">
-            <h2>Start with an empty file.</h2>
-            <p className="lead">Sign in with your email and the editor is ready.</p>
+            <h2>{copy.closeTitle}</h2>
+            <p className="lead">{copy.closeLead}</p>
             <button type="button" className="glp-btn glp-btn-primary" onClick={() => setEmailOpen(true)}>Open the editor</button>
           </div>
         </section>

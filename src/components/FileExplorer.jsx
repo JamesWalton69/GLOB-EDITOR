@@ -9,6 +9,7 @@ import ContextMenu from './ContextMenu';
 
 export default function FileExplorer({ isAdmin, user, onSelectFile, activeFilePath, addToast, onPathsRenamed }) {
   const [items, setItems] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(100);
   const [currentPath, setCurrentPath] = useState(isAdmin ? '' : user.$id);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(null); // 'file' | 'folder' | null
@@ -26,6 +27,7 @@ export default function FileExplorer({ isAdmin, user, onSelectFile, activeFilePa
     setLoading(true);
     try {
       setItems(await listDirectory(currentPath));
+      setVisibleCount(100);
     } catch (err) { addToast('error', err.message); }
     setLoading(false);
   }, [currentPath, addToast]);
@@ -144,6 +146,7 @@ export default function FileExplorer({ isAdmin, user, onSelectFile, activeFilePa
               {creating === 'file' ? <FileCode size={13} color="var(--accent-primary)" /> : <Folder size={13} color="#f9e2af" />}
               <input
                 ref={newInputRef}
+                maxLength={255}
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 onBlur={() => { if (!newName) setCreating(null); }}
@@ -164,7 +167,8 @@ export default function FileExplorer({ isAdmin, user, onSelectFile, activeFilePa
             Empty workspace.<br />Create a file to begin.
           </div>
         ) : (
-          items.map(item => {
+          <>
+            {items.slice(0, visibleCount).map(item => {
             const isFolder = !item.id;
             const fullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
             const isActive = !isFolder && activeFilePath === fullPath;
@@ -178,6 +182,7 @@ export default function FileExplorer({ isAdmin, user, onSelectFile, activeFilePa
                     {isFolder ? <Folder size={13} color="#f9e2af" /> : <FileCode size={13} color={color} />}
                     <input
                       ref={renameInputRef}
+                      maxLength={255}
                       value={renameValue}
                       onChange={e => setRenameValue(e.target.value)}
                       onBlur={() => setRenaming(null)}
@@ -200,7 +205,7 @@ export default function FileExplorer({ isAdmin, user, onSelectFile, activeFilePa
                   ? <Folder size={14} color={color} />
                   : <FileCode size={14} color={color} />
                 }
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span title={item.name} dir="auto" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.name}
                 </span>
                 <div className="item-actions">
@@ -215,7 +220,18 @@ export default function FileExplorer({ isAdmin, user, onSelectFile, activeFilePa
                 </div>
               </div>
             );
-          })
+            })}
+            {visibleCount < items.length && (
+              <button
+                type="button"
+                className="explorer-item"
+                style={{ width: '100%', color: 'var(--text-muted)' }}
+                onClick={() => setVisibleCount(count => count + 100)}
+              >
+                Show more ({items.length - visibleCount} remaining)
+              </button>
+            )}
+          </>
         )}
       </div>
 

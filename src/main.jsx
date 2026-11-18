@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import StyleSwitcher from './components/StyleSwitcher';
+import DataToggle from './components/DataToggle';
 import './index.css';
 import './theme-core.css';
 import './themes/paper.css';
@@ -17,6 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <AuthProvider>
       <App />
       <StyleSwitcher />
+      <DataToggle />
     </AuthProvider>
   </React.StrictMode>,
 );
