@@ -7,13 +7,16 @@ import ToastContainer from './components/ToastContainer';
 import FileExplorer from './components/FileExplorer';
 import SearchPanel from './components/SearchPanel';
 import SettingsPanel from './components/SettingsPanel';
+import CommandPalette from './components/CommandPalette';
+import WelcomePanel from './components/WelcomePanel';
 import LandingPage from './components/LandingPage';
 import './App.css';
 import {
   FileCode, Search, Settings, LogOut,
   Save, Code, X,
   Terminal as TerminalIcon, Shield,
-  GitBranch, Download, Maximize2, Minimize2
+  GitBranch, Download, Maximize2, Minimize2,
+  Play, Cloud, Sun, Moon, Command
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 
@@ -28,7 +31,7 @@ const PYODIDE_INPUT_BUFFER_SIZE = 64 * 1024;
 const SETTINGS_KEY = 'globeditor.settings';
 const SETTINGS_DEFAULTS = {
   fontSize: 13, wordWrap: 'off', minimap: false,
-  tabSize: 2, theme: 'vs-dark', autoSave: false, termFontSize: 12,
+  tabSize: 2, theme: 'vs', autoSave: false, termFontSize: 12,
   cloudProvider: 'jdoodle',
 };
 
@@ -77,6 +80,8 @@ export default function App() {
   const [tabs, setTabs] = useState([]); // { path, content, modified }
   const [activeTabPath, setActiveTabPath] = useState(null);
   const [activePanel, setActivePanel] = useState('files');
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteFiles, setPaletteFiles] = useState([]);
   const editorRef = useRef(null);
   const editorInstanceRef = useRef(null); // monaco editor instance
 
@@ -183,17 +188,31 @@ export default function App() {
     addToast('success', `Saved ${basename(activeTabPath)}`);
   }, [activeTabPath, addToast]);
 
+  const openPalette = useCallback(async () => {
+    try {
+      const paths = await listAllFiles(isAdmin ? '' : user.$id);
+      setPaletteFiles(paths.filter(path => !path.endsWith('/.keep')));
+    } catch {
+      setPaletteFiles(tabs.map(tab => tab.path));
+    }
+    setPaletteOpen(true);
+  }, [isAdmin, user, tabs]);
+
   // ── keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         saveActiveFile();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (paletteOpen) setPaletteOpen(false);
+        else openPalette();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [saveActiveFile]);
+  }, [saveActiveFile, openPalette, paletteOpen]);
 
   // ── auto-save
   useEffect(() => {
@@ -655,6 +674,7 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={openPalette} className="btn-icon" title="Commands (Ctrl+K)"><Command size={14} /></button>
           {activeTabObj && (
             <>
               <button onClick={downloadFile} className="btn-icon" title="Download file"><Download size={14} /></button>
@@ -736,13 +756,9 @@ export default function App() {
           </div>
 
           {/* Monaco Editor */}
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#000', display: paneMode === 'terminal' ? 'none' : 'block' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--bg-surface)', display: paneMode === 'terminal' ? 'none' : 'block' }}>
             {!activeTabObj ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px', color: 'var(--text-dim)' }}>
-                <Code size={48} style={{ opacity: 0.06 }} />
-                <span style={{ fontSize: '13px' }}>Open a file to start editing</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Use the explorer on the left</span>
-              </div>
+              <WelcomePanel onShowFiles={() => setActivePanel('files')} onOpenPalette={openPalette} />
             ) : (
               <Editor
                 key={activeTabPath}
@@ -878,6 +894,25 @@ export default function App() {
         </div>
         {isExecuting && <div className="status-bar-item" style={{ color: '#a2e3a2' }}>⟳ Running…</div>}
       </div>
+
+      <CommandPalette
+        key={paletteOpen ? 'palette-open' : 'palette-closed'}
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        files={paletteFiles}
+        onOpenFile={openFile}
+        actions={[
+          { id: 'run-local', label: 'Run locally (Python)', detail: 'Pyodide', icon: Play, run: runLocally },
+          { id: 'run-cloud', label: 'Run in cloud', detail: 'JDoodle / OnlineCompiler', icon: Cloud, run: runInCloud },
+          { id: 'save', label: 'Save active file', icon: Save, run: saveActiveFile },
+          {
+            id: 'theme',
+            label: settings.theme === 'vs' ? 'Switch to dark editor' : 'Switch to light editor',
+            icon: settings.theme === 'vs' ? Moon : Sun,
+            run: () => updateSetting('theme', settings.theme === 'vs' ? 'vs-dark' : 'vs'),
+          },
+        ]}
+      />
 
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} />

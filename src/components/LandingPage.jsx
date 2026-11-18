@@ -72,16 +72,20 @@ export default function LandingPage({ onSignIn, onSendCode, onVerify }) {
                 <a className="glp-btn glp-btn-quiet" href="#runners">See how it runs</a>
               </div>
             </div>
-            <figure className="glp-shot">
-              <img
-                src="/globeditor-ide.jpg"
-                alt="GlobEditor running in a browser tab with a Python file open and the integrated terminal showing its commands"
-                width={1296}
-                height={1006}
-                fetchPriority="high"
-              />
-              <figcaption>The editor, open in a browser tab</figcaption>
-            </figure>
+            <div className="glp-hero-stage">
+              <div className="glp-stage-card glp-stage-card-back" aria-hidden="true" />
+              <div className="glp-stage-card glp-stage-card-front" aria-hidden="true" />
+              <figure className="glp-shot">
+                <img
+                  src="/globeditor-ide.jpg"
+                  alt="GlobEditor running in a browser tab with a Python file open and the integrated terminal showing its commands"
+                  width={1296}
+                  height={1006}
+                  fetchPriority="high"
+                />
+                <figcaption>The editor, open in a browser tab</figcaption>
+              </figure>
+            </div>
           </div>
         </section>
 
